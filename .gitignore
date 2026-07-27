@@ -19,6 +19,7 @@ venv/
 env/
 
 # Data and generated artifacts
+data/
 data/raw/
 data/interim/
 data/processed/

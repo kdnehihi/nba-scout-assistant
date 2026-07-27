@@ -31,6 +31,8 @@ mlflow>=3.0,<4.0
 httpx>=0.28,<1.0
 requests>=2.32,<3.0
 tenacity>=9.0,<10.0
+nba_api>=1.10,<2.0
+kaggle>=2.2,<3.0
 
 # Observability
 loguru>=0.7,<1.0
