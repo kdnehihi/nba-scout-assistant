@@ -1,0 +1,37 @@
+# Core API
+fastapi>=0.116,<1.0
+uvicorn[standard]>=0.35,<1.0
+pydantic>=2.11,<3.0
+pydantic-settings>=2.10,<3.0
+python-dotenv>=1.1,<2.0
+
+# Data processing
+numpy>=2.2,<3.0
+pandas>=2.2,<3.0
+scipy>=1.14,<2.0
+pyarrow>=18.0,<22.0
+duckdb>=1.2,<2.0
+
+# Machine learning
+scikit-learn>=1.6,<2.0
+xgboost>=3.0,<4.0
+joblib>=1.4,<2.0
+shap>=0.47,<1.0
+
+# Storage and database
+sqlalchemy>=2.0,<3.0
+psycopg[binary]>=3.2,<4.0
+alembic>=1.15,<2.0
+
+# Data validation and experiment tracking
+pandera>=0.24,<1.0
+mlflow>=3.0,<4.0
+
+# HTTP clients and reliability
+httpx>=0.28,<1.0
+requests>=2.32,<3.0
+tenacity>=9.0,<10.0
+
+# Observability
+loguru>=0.7,<1.0
+prometheus-client>=0.22,<1.0

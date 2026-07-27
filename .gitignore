@@ -1,0 +1,33 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Data and generated artifacts
+data/raw/
+data/interim/
+data/processed/
+data/features/
+models/
+mlruns/
+reports/
+
+# OS and editor
+.DS_Store
+.idea/
+.vscode/

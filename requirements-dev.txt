@@ -1,0 +1,17 @@
+-r requirements.txt
+
+# Testing
+pytest>=8.4,<9.0
+pytest-cov>=6.2,<7.0
+pytest-mock>=3.14,<4.0
+
+# Code quality
+ruff>=0.12,<1.0
+mypy>=1.16,<2.0
+pre-commit>=4.2,<5.0
+
+# Notebooks and exploration
+ipykernel>=6.29,<7.0
+jupyterlab>=4.4,<5.0
+matplotlib>=3.10,<4.0
+seaborn>=0.13,<1.0
