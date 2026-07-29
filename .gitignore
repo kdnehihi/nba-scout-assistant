@@ -26,6 +26,8 @@ data/processed/
 data/features/
 models/
 mlruns/
+mlflow.db
+mlartifacts/
 reports/
 
 # OS and editor
