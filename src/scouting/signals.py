@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from .config import TrendConfig
+from .config import ConsistencyConfig, TrendConfig
 
 
 def season_start_year(season: object) -> int:
@@ -84,13 +84,18 @@ def build_player_trend_signals(
     return latest[output_cols].reset_index(drop=True)
 
 
-def build_player_consistency_signals(performance_df: pd.DataFrame, min_games: int = 10) -> pd.DataFrame:
+def build_player_consistency_signals(
+    performance_df: pd.DataFrame,
+    config: ConsistencyConfig = ConsistencyConfig(),
+    min_games: int | None = None,
+) -> pd.DataFrame:
     # Summarize player-season production volatility from observed game logs.
     """Return player-season consistency and volatility descriptors."""
+    min_required_games = config.min_games if min_games is None else min_games
     rows: list[dict[str, object]] = []
     for keys, group in performance_df.groupby(["player_id", "season", "team_id"], dropna=False):
         player_id, season, team_id = keys
-        if len(group) < min_games:
+        if len(group) < min_required_games:
             continue
         row: dict[str, object] = {
             "player_id": player_id,
@@ -108,9 +113,9 @@ def build_player_consistency_signals(performance_df: pd.DataFrame, min_games: in
             row[f"{stat}_mean"] = mean_value
             row[f"{stat}_std"] = std_value
             row[f"{stat}_cv"] = float(std_value / mean_value) if mean_value > 0 else np.nan
-            row[f"{stat}_p20"] = float(values.quantile(0.20))
-            row[f"{stat}_p50"] = float(values.quantile(0.50))
-            row[f"{stat}_p80"] = float(values.quantile(0.80))
+            row[f"{stat}_p20"] = float(values.quantile(config.lower_quantile))
+            row[f"{stat}_p50"] = float(values.quantile(config.median_quantile))
+            row[f"{stat}_p80"] = float(values.quantile(config.upper_quantile))
             row[f"{stat}_above_mean_rate"] = float((values > mean_value).mean())
         rows.append(row)
 
@@ -126,11 +131,13 @@ def build_player_consistency_signals(performance_df: pd.DataFrame, min_games: in
     result["overall_volatility_score"] = result[volatility_cols].mean(axis=1)
     result["consistency_label"] = pd.Series(
         np.select(
-            [result["overall_volatility_score"] <= -0.5, result["overall_volatility_score"] >= 0.5],
+            [
+                result["overall_volatility_score"] <= config.consistent_threshold,
+                result["overall_volatility_score"] >= config.volatile_threshold,
+            ],
             ["consistent", "volatile"],
             default="balanced",
         ),
         index=result.index,
     )
     return result.sort_values(["season_start_year", "player_id"]).reset_index(drop=True)
-
