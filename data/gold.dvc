@@ -1,0 +1,6 @@
+outs:
+- md5: 1e23564bc690afc195fc07d16a92016d.dir
+  size: 16322912
+  nfiles: 13
+  hash: md5
+  path: gold

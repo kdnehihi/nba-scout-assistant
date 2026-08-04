@@ -24,6 +24,7 @@ psycopg[binary]>=3.2,<4.0
 alembic>=1.15,<2.0
 
 # Data validation and experiment tracking
+dvc>=3.60,<4.0
 pandera>=0.24,<1.0
 mlflow>=3.0,<4.0
 
