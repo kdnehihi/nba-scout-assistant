@@ -13,14 +13,14 @@ LSTM_TASK_CONFIG = {
     "pts": LSTMTaskConfig(
         stat_col="pts",
         stat_avg_col="pts_season_avg",
-        target_col="target_next_5_pts",
+        target_col="target_next_5_pts_avg",
         sequence_length=10,
     ),
 
     "ast": LSTMTaskConfig(
         stat_col="ast",
         stat_avg_col="ast_season_avg",
-        target_col="target_next_5_ast",
+        target_col="target_next_5_pts_avg",
         sequence_length=10,
     ),
 
