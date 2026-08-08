@@ -22,7 +22,8 @@ env/
 /data/*
 !/data/.gitignore
 !/data/*.dvc
-models/
+/models/
+/artifacts/
 mlruns/
 mlflow.db
 mlartifacts/
