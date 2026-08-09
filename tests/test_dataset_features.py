@@ -128,5 +128,14 @@ def test_build_salary_training_merges_cap_players_and_role_features():
 def test_build_long_term_training_creates_horizon_targets():
     long_term = build_long_term_training(sample_game_logs(), sample_players(), sample_season_stats())
 
-    assert {"active_h1", "pts_per_36_h1", "low_availability_h1", "split"}.issubset(long_term.columns)
+    assert {
+        "active_h1",
+        "pts_per_36_h1",
+        "pts_per_100_h1",
+        "pts_per_game_h1",
+        "minutes_per_game_h1",
+        "recent_pts_per_36",
+        "pts_per_36_slope_3yr",
+        "split",
+    }.issubset(long_term.columns)
     assert set(long_term["split"]).issubset({"train", "validation", "test"})
