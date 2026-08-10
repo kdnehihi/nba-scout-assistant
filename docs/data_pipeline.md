@@ -72,6 +72,71 @@ data/silver/player_season_salaries.parquet
 Notebook workflows may materialize additional gold artifacts, but the local
 pipeline source focuses on the core clean modeling tables.
 
+## Source Data Inventory
+
+The exploratory notebook `notebooks/01_data_processing.ipynb` uses several
+external and curated sources because no single public dataset contains all
+fields required for player performance, role similarity, long-term forecasting,
+and salary valuation.
+
+The current source inventory is:
+
+| Data domain | Primary source | Local path | Main fields used | Downstream use |
+| --- | --- | --- | --- | --- |
+| Historical player game logs | KaggleHub dataset `szymonjwiak/nba-traditional` | `data/raw/nba_traditional/` -> `data/silver/player_game_logs.parquet` | `player_id`, `player_name`, `game_id`, `game_date`, `season`, `team_id`, `minutes`, `points`, `assists`, `rebounds`, rebounds by type, steals, blocks, fouls, turnovers, FGA, FTA, 3PA, team/opponent context | Short-term forecasting, long-term season summaries, defensive proxies, rolling form |
+| Player bio/profile | `Players.csv` staged as `eoin_players.csv` from the historical NBA data/player box-score source | `data/raw/player_bio/eoin_players.csv` -> `data/raw/players.parquet` | `player_id`, `player_name`, `birth_date`, `position`, `height`, `weight` | Age at season/anchor, role filters, similarity, salary joins, long-term features |
+| Base advanced/rate season stats | Staged advanced, usage, and defense regular-season CSV snapshots | `data/raw/player_stats_advanced/player_stats_advanced_rs.csv`, `player_stats_usage_rs.csv`, `player_stats_defense_rs.csv` -> `data/raw/player_season_stats.parquet` | usage, true shooting, three-point attempt rate, free-throw rate, turnover rate, steal/block/defensive rebound/foul rates, pace, possessions, offensive/defensive rating | Role features, salary features, long-term normalized production context |
+| 2023-24 advanced stat patch | KaggleHub dataset `rodneycarroll78/nba-stats-1980-2024` | `data/raw/player_stats_advanced_patch/2023_24/Advanced.csv` | Basketball-Reference-style advanced/rate stats for recent-season coverage | Fills sparse advanced coverage for 2023-24 |
+| 2024-25 advanced stat patch | KaggleHub dataset `ratin21/nba-player-stats-2024-25-per-game` | `data/raw/player_stats_advanced_patch/2024_25/NBA Player Advanced Stats_2024-25.csv`, `NBA Player Stats_2024-25_Total.csv` | 2024-25 advanced rates plus totals/minutes/team context | Fills sparse advanced coverage for 2024-25 |
+| Historical player salaries | Kaggle salary dataset staged into silver salary table | `data/silver/player_season_salaries.parquet` | `player_name`, `team`, `season_start_year`, `season_end_year`, `season_label`, `salary_usd`, `source`, `source_file`, `collected_at` | Salary analysis and salary forecasting |
+| Salary cap and tax level | Curated NBA salary-cap history, backed by official NBA cap releases where available | `data/raw/salary_cap/salary_cap_by_season.csv` | `season`, `salary_cap_usd`, `tax_level_usd` | `salary_cap_share`, cross-era salary normalization |
+| NBA API fallback | `nba_api` / `stats.nba.com` endpoints | `data/raw/nba_api_cache/`, `data/raw/player_game_logs_nba_api.parquet` | fallback player metadata, game logs, season stats | Fallback only; not the primary historical source because live requests can timeout/throttle |
+
+### Source Selection Notes
+
+- Game logs prefer KaggleHub snapshots over live `stats.nba.com` requests. The
+  notebook keeps `nba_api` as a fallback because live NBA Stats requests can
+  timeout or be throttled.
+- Player bio is kept as a separate raw source so age is calculated relative to
+  the modeling date instead of stored as one fixed value.
+- Advanced/rate stats are assembled from a base regular-season snapshot plus
+  recent-season patches. This avoids losing important role features such as
+  `usage_pct`, `true_shooting_pct`, `stl_pct`/steal rate, `blk_pct`/block rate,
+  pace, and rating fields in 2023-24 and 2024-25.
+- Salary modeling uses `salary_cap_share = salary_usd / salary_cap_usd` as the
+  primary normalized salary target. Raw USD salary is retained for reporting and
+  conversion back to dollar estimates.
+- The canonical local training pipeline expects staged canonical files. It does
+  not download from Kaggle or call `nba_api` directly; source acquisition is
+  handled by notebooks or manual data refresh steps before local training.
+
+## Source-To-Gold Lineage
+
+The source-to-output flow is:
+
+```text
+Kaggle nba-traditional
+  -> data/silver/player_game_logs.parquet
+  -> performance_training_clean.parquet
+  -> long_term_player_forecast_training.parquet
+
+Player bio/profile CSV
+  -> data/raw/players.parquet
+  -> player_role_features_clean.parquet
+  -> salary_training_clean.parquet
+  -> long_term_player_forecast_training.parquet
+
+Advanced / usage / defense season stats + recent-season patches
+  -> data/raw/player_season_stats.parquet
+  -> player_role_features_clean.parquet
+  -> salary_training_clean.parquet
+  -> long_term_player_forecast_training.parquet
+
+Historical salaries + salary cap table
+  -> data/silver/player_season_salaries.parquet
+  -> salary_training_clean.parquet
+```
+
 ## File-by-File Reference
 
 ## `src/dataset/loaders.py`
