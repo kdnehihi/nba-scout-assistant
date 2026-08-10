@@ -12,7 +12,7 @@ The deterministic layer currently covers:
 - player consistency and volatility signals
 - short-term expected/floor/ceiling ranges
 - replacement candidate ranking
-- salary value labels when a salary prediction is available
+- compensation context for player detail pages
 
 The goal is to keep these signals simple, auditable, and low-risk. When a
 heuristic contains tunable weights or thresholds, the preferred approach is to
@@ -47,7 +47,6 @@ Only the first group should be described as data-calibrated.
 | consistency label bands | `-0.5/0.5` | descriptive | interpretability bands around season-relative robust z-score |
 | similarity feature weights | equal | descriptive | standardized role similarity without relevance labels |
 | `similarity_score` formula | `1 / (1 + distance)` | deterministic transform | monotonic conversion from distance to score |
-| salary fair value tolerance | `0.10` | business rule | practical value band, not model-calibrated |
 
 The descriptive parameters are intentionally centralized in config classes where
 possible. They should be recalibrated only after the project has labels or a
@@ -66,7 +65,7 @@ The notebook reads the same clean gold data used by local modules:
 ```text
 data/gold/performance_training_clean.parquet
 data/gold/player_role_features_clean.parquet
-data/gold/salary_training_clean.parquet
+data/gold/player_salary_history_clean.parquet
 ```
 
 ## Trend Signals
@@ -404,35 +403,38 @@ not as:
 equivalent player quality
 ```
 
-## Salary Value Signals
+## Compensation Context
 
 ### Purpose
 
-Salary value signals convert a salary model prediction into scout-readable
-labels:
+Compensation context attaches current and historical salary data to player
+detail pages after recommendations are generated. It is descriptive reference
+data, not a prediction task.
 
 ```text
-underpaid / fair_value / overpaid
+latest salary
+salary cap share
+salary history
+optional contract history
 ```
 
 The local implementation is:
 
 ```text
-src/scouting/value.py
+src/scouting/compensation.py
 ```
 
 The main function is:
 
 ```python
-build_salary_value_signals(...)
+build_player_compensation_context(...)
 ```
 
-### Calibration Status
+### Status
 
-This logic depends on a trained salary model. The current label tolerance is a
-deterministic business threshold. It should be revisited after salary model
-selection and after the project defines how wide a practical salary value band
-should be.
+The salary and contract datasets are too sparse and contract-dependent for a
+reliable local salary forecast. The product should display this information as
+context for scout review rather than presenting a model-estimated salary value.
 
 ## Local Promotion Rules
 

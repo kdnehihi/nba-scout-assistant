@@ -60,7 +60,7 @@ def add_role_dimensions(df: pd.DataFrame) -> pd.DataFrame:
 
 def build_role_features(players: pd.DataFrame, season_stats: pd.DataFrame) -> pd.DataFrame:
     # Join player metadata and season stats into role features.
-    """Build player-season role features for similarity and salary joins."""
+    """Build player-season role features for similarity and forecasting."""
     role = season_stats.copy()
     for column in [
         "usage_pct",
@@ -101,4 +101,3 @@ def build_role_features(players: pd.DataFrame, season_stats: pd.DataFrame) -> pd
 
     role = role.drop_duplicates(["player_id", "season", "team_id"]).reset_index(drop=True)
     return role
-

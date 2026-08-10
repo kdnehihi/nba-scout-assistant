@@ -4,7 +4,7 @@ NBA Scout Assistant is an end-to-end machine learning scouting project for NBA
 player evaluation. It builds clean player datasets, trains forecasting models,
 tracks experiments with MLflow, and prepares data products for player
 similarity, performance forecasting, long-term trajectory forecasting, and
-salary valuation.
+compensation context.
 
 ## Core Tasks
 
@@ -12,9 +12,10 @@ salary valuation.
   points, assists, and rebounds.
 - Long-term player trajectory forecasting: estimate future availability and
   per-minute/per-possession production across H1, H2, and H3 seasons.
-- Salary valuation: estimate salary value through salary-cap-normalized targets.
 - Player recommendation and similarity: compare players using role, production,
-  physical profile, and salary-aware scouting signals.
+  physical profile, and scouting signals.
+- Player detail context: show current/historical salary and contract history for
+  reference alongside forecasting outputs.
 
 ## Data Sources
 
@@ -31,6 +32,7 @@ and salary-cap context.
 | 2024-25 advanced patch | KaggleHub dataset `ratin21/nba-player-stats-2024-25-per-game` | `data/raw/player_stats_advanced_patch/2024_25/*.csv` |
 | Historical salaries | Kaggle salary history staged into the silver salary table | `data/silver/player_season_salaries.parquet` |
 | Salary cap history | Curated NBA salary-cap and tax-level history | `data/raw/salary_cap/salary_cap_by_season.csv` |
+| Optional contract history | Manually staged contract-event reference data | `data/raw/contract_value/contract_events.csv` |
 | NBA API fallback | `nba_api` / `stats.nba.com` | `data/raw/nba_api_cache/` |
 
 Notebook workflows can fetch or refresh some external sources. Local source
@@ -55,7 +57,7 @@ Important gold outputs:
 ```text
 data/gold/player_role_features_clean.parquet
 data/gold/performance_training_clean.parquet
-data/gold/salary_training_clean.parquet
+data/gold/player_salary_history_clean.parquet
 data/gold/long_term_player_forecast_training.parquet
 ```
 
@@ -65,7 +67,7 @@ Local data builders live under `src/dataset/`:
 - `cleaning.py`: shared cleaning utilities
 - `features_role.py`: player-season role features
 - `features_performance.py`: short-term rolling features and next-five targets
-- `features_salary.py`: salary, cap, bio, and role joins
+- `features_compensation.py`: player salary history and salary-cap context
 - `features_long_term.py`: season-anchor long-term forecasting data
 - `long_term.py`: final long-term modeling data preparation and schema checks
 - `pipeline.py`: orchestration for rebuilding gold datasets

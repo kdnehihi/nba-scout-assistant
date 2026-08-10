@@ -37,4 +37,4 @@ def test_build_all_gold_datasets_writes_outputs(tmp_path):
     outputs = build_all_gold_datasets(paths)
 
     assert "performance_training_clean" in outputs
-    assert (paths.gold_dir / "salary_training_clean.parquet").exists()
+    assert (paths.gold_dir / "player_salary_history_clean.parquet").exists()

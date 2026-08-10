@@ -81,11 +81,3 @@ class SimilarityConfig:
         )
     )
     same_position_group: bool = True
-
-
-@dataclass(frozen=True)
-class SalaryValueConfig:
-    """Business-rule settings for salary value labels."""
-
-    # Practical value band around the salary model prediction; not model-calibrated.
-    fair_value_tolerance: float = 0.10

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import pandas as pd
 
+from dataset.features_compensation import build_player_salary_history
 from dataset.features_long_term import build_long_term_training
 from dataset.features_performance import build_performance_training
 from dataset.features_role import build_role_features
-from dataset.features_salary import build_salary_training
 
 
 def sample_players() -> pd.DataFrame:
@@ -101,8 +101,7 @@ def test_build_performance_training_creates_next_five_targets():
     assert performance["target_next_5_pts_avg"].notna().all()
 
 
-def test_build_salary_training_merges_cap_players_and_role_features():
-    role = build_role_features(sample_players(), sample_season_stats())
+def test_build_player_salary_history_merges_cap_and_player_ids():
     salaries = pd.DataFrame(
         {
             "player_name": ["Player One"],
@@ -118,11 +117,12 @@ def test_build_salary_training_merges_cap_players_and_role_features():
     )
     salary_cap = pd.DataFrame({"season": ["2022-23"], "salary_cap_usd": [100_000_000], "tax_level_usd": [120_000_000]})
 
-    salary = build_salary_training(salaries, salary_cap, sample_players(), role)
+    salary = build_player_salary_history(salaries, salary_cap, sample_players())
 
+    assert salary["player_id"].iloc[0] == 1
     assert salary["salary_cap_share"].iloc[0] == 0.1
-    assert "scoring_creation" in salary.columns
-    assert salary["split"].iloc[0] == "train"
+    assert "target_salary_usd" not in salary.columns
+    assert "split" not in salary.columns
 
 
 def test_build_long_term_training_creates_horizon_targets():

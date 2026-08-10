@@ -140,7 +140,7 @@ def load_player_season_stats(paths: DataPaths) -> pd.DataFrame:
 
 
 def load_player_season_salaries(paths: DataPaths) -> pd.DataFrame:
-    # Read normalized salary rows used for salary modeling.
+    # Read normalized salary rows used for player compensation context.
     """Load normalized player-season salary data from the silver layer."""
     df = load_tabular_data(paths.silver_dir / "player_season_salaries.parquet")
     require_columns(df, ["player_name", "season_label", "salary_usd"], "player_season_salaries")
@@ -148,7 +148,7 @@ def load_player_season_salaries(paths: DataPaths) -> pd.DataFrame:
 
 
 def load_salary_cap(paths: DataPaths) -> pd.DataFrame:
-    # Read salary-cap context used to normalize salary targets.
+    # Read salary-cap context used to normalize salary history.
     """Load salary-cap data by NBA season."""
     df = load_tabular_data(paths.raw_dir / "salary_cap" / "salary_cap_by_season.csv")
     require_columns(df, ["season", "salary_cap_usd"], "salary_cap_by_season")
@@ -167,14 +167,22 @@ def load_performance_training_clean(paths: DataPaths) -> pd.DataFrame:
     return load_tabular_data(paths.gold_dir / "performance_training_clean.parquet")
 
 
-def load_salary_training_clean(paths: DataPaths) -> pd.DataFrame:
-    # Read the materialized salary training table from the gold layer.
-    """Load clean salary training data from the gold layer."""
-    return load_tabular_data(paths.gold_dir / "salary_training_clean.parquet")
+def load_player_salary_history_clean(paths: DataPaths) -> pd.DataFrame:
+    # Read the materialized player salary history table from the gold layer.
+    """Load clean player salary history from the gold layer."""
+    return load_tabular_data(paths.gold_dir / "player_salary_history_clean.parquet")
+
+
+def load_contract_history(paths: DataPaths, required: bool = False) -> pd.DataFrame:
+    # Read optional contract-event history for player detail pages.
+    """Load optional contract history rows from the raw data layer."""
+    path = paths.raw_dir / "contract_value" / "contract_events.csv"
+    if not path.exists() and not required:
+        return pd.DataFrame()
+    return load_tabular_data(path)
 
 
 def load_long_term_training(paths: DataPaths) -> pd.DataFrame:
     # Read the materialized long-term training table from the gold layer.
     """Load clean long-term player forecast training data from the gold layer."""
     return load_tabular_data(paths.gold_dir / "long_term_player_forecast_training.parquet")
-

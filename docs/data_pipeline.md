@@ -29,7 +29,7 @@ load_salary_cap()
         v
 build_role_features()
 build_performance_training()
-build_salary_training()
+build_player_salary_history()
 build_long_term_training()
         |
         v
@@ -41,7 +41,7 @@ The key gold outputs are:
 ```text
 data/gold/player_role_features_clean.parquet
 data/gold/performance_training_clean.parquet
-data/gold/salary_training_clean.parquet
+data/gold/player_salary_history_clean.parquet
 data/gold/long_term_player_forecast_training.parquet
 ```
 
@@ -77,19 +77,20 @@ pipeline source focuses on the core clean modeling tables.
 The exploratory notebook `notebooks/01_data_processing.ipynb` uses several
 external and curated sources because no single public dataset contains all
 fields required for player performance, role similarity, long-term forecasting,
-and salary valuation.
+recommendations, and compensation context.
 
 The current source inventory is:
 
 | Data domain | Primary source | Local path | Main fields used | Downstream use |
 | --- | --- | --- | --- | --- |
 | Historical player game logs | KaggleHub dataset `szymonjwiak/nba-traditional` | `data/raw/nba_traditional/` -> `data/silver/player_game_logs.parquet` | `player_id`, `player_name`, `game_id`, `game_date`, `season`, `team_id`, `minutes`, `points`, `assists`, `rebounds`, rebounds by type, steals, blocks, fouls, turnovers, FGA, FTA, 3PA, team/opponent context | Short-term forecasting, long-term season summaries, defensive proxies, rolling form |
-| Player bio/profile | `Players.csv` staged as `eoin_players.csv` from the historical NBA data/player box-score source | `data/raw/player_bio/eoin_players.csv` -> `data/raw/players.parquet` | `player_id`, `player_name`, `birth_date`, `position`, `height`, `weight` | Age at season/anchor, role filters, similarity, salary joins, long-term features |
-| Base advanced/rate season stats | Staged advanced, usage, and defense regular-season CSV snapshots | `data/raw/player_stats_advanced/player_stats_advanced_rs.csv`, `player_stats_usage_rs.csv`, `player_stats_defense_rs.csv` -> `data/raw/player_season_stats.parquet` | usage, true shooting, three-point attempt rate, free-throw rate, turnover rate, steal/block/defensive rebound/foul rates, pace, possessions, offensive/defensive rating | Role features, salary features, long-term normalized production context |
+| Player bio/profile | `Players.csv` staged as `eoin_players.csv` from the historical NBA data/player box-score source | `data/raw/player_bio/eoin_players.csv` -> `data/raw/players.parquet` | `player_id`, `player_name`, `birth_date`, `position`, `height`, `weight` | Age at season/anchor, role filters, similarity, compensation joins, long-term features |
+| Base advanced/rate season stats | Staged advanced, usage, and defense regular-season CSV snapshots | `data/raw/player_stats_advanced/player_stats_advanced_rs.csv`, `player_stats_usage_rs.csv`, `player_stats_defense_rs.csv` -> `data/raw/player_season_stats.parquet` | usage, true shooting, three-point attempt rate, free-throw rate, turnover rate, steal/block/defensive rebound/foul rates, pace, possessions, offensive/defensive rating | Role features, recommendation features, long-term normalized production context |
 | 2023-24 advanced stat patch | KaggleHub dataset `rodneycarroll78/nba-stats-1980-2024` | `data/raw/player_stats_advanced_patch/2023_24/Advanced.csv` | Basketball-Reference-style advanced/rate stats for recent-season coverage | Fills sparse advanced coverage for 2023-24 |
 | 2024-25 advanced stat patch | KaggleHub dataset `ratin21/nba-player-stats-2024-25-per-game` | `data/raw/player_stats_advanced_patch/2024_25/NBA Player Advanced Stats_2024-25.csv`, `NBA Player Stats_2024-25_Total.csv` | 2024-25 advanced rates plus totals/minutes/team context | Fills sparse advanced coverage for 2024-25 |
-| Historical player salaries | Kaggle salary dataset staged into silver salary table | `data/silver/player_season_salaries.parquet` | `player_name`, `team`, `season_start_year`, `season_end_year`, `season_label`, `salary_usd`, `source`, `source_file`, `collected_at` | Salary analysis and salary forecasting |
-| Salary cap and tax level | Curated NBA salary-cap history, backed by official NBA cap releases where available | `data/raw/salary_cap/salary_cap_by_season.csv` | `season`, `salary_cap_usd`, `tax_level_usd` | `salary_cap_share`, cross-era salary normalization |
+| Historical player salaries | Kaggle salary dataset staged into silver salary table | `data/silver/player_season_salaries.parquet` | `player_name`, `team`, `season_start_year`, `season_end_year`, `season_label`, `salary_usd`, `source`, `source_file`, `collected_at` | Current and historical salary context on player detail pages |
+| Salary cap and tax level | Curated NBA salary-cap history, backed by official NBA cap releases where available | `data/raw/salary_cap/salary_cap_by_season.csv` | `season`, `salary_cap_usd`, `tax_level_usd` | `salary_cap_share` for cross-era salary context |
+| Optional contract history | Manually staged contract-event reference data | `data/raw/contract_value/contract_events.csv` | player name, contract start/end, average salary, pre-contract box-score context | Contract history display only |
 | NBA API fallback | `nba_api` / `stats.nba.com` endpoints | `data/raw/nba_api_cache/`, `data/raw/player_game_logs_nba_api.parquet` | fallback player metadata, game logs, season stats | Fallback only; not the primary historical source because live requests can timeout/throttle |
 
 ### Source Selection Notes
@@ -103,9 +104,8 @@ The current source inventory is:
   recent-season patches. This avoids losing important role features such as
   `usage_pct`, `true_shooting_pct`, `stl_pct`/steal rate, `blk_pct`/block rate,
   pace, and rating fields in 2023-24 and 2024-25.
-- Salary modeling uses `salary_cap_share = salary_usd / salary_cap_usd` as the
-  primary normalized salary target. Raw USD salary is retained for reporting and
-  conversion back to dollar estimates.
+- Salary history uses `salary_cap_share = salary_usd / salary_cap_usd` only as
+  context. The local pipeline does not train a salary model.
 - The canonical local training pipeline expects staged canonical files. It does
   not download from Kaggle or call `nba_api` directly; source acquisition is
   handled by notebooks or manual data refresh steps before local training.
@@ -123,18 +123,17 @@ Kaggle nba-traditional
 Player bio/profile CSV
   -> data/raw/players.parquet
   -> player_role_features_clean.parquet
-  -> salary_training_clean.parquet
+  -> player_salary_history_clean.parquet
   -> long_term_player_forecast_training.parquet
 
 Advanced / usage / defense season stats + recent-season patches
   -> data/raw/player_season_stats.parquet
   -> player_role_features_clean.parquet
-  -> salary_training_clean.parquet
   -> long_term_player_forecast_training.parquet
 
 Historical salaries + salary cap table
   -> data/silver/player_season_salaries.parquet
-  -> salary_training_clean.parquet
+  -> player_salary_history_clean.parquet
 ```
 
 ## File-by-File Reference
@@ -191,7 +190,8 @@ Dataset-specific loaders:
 - `load_salary_cap(paths)`
 - `load_role_features_clean(paths)`
 - `load_performance_training_clean(paths)`
-- `load_salary_training_clean(paths)`
+- `load_player_salary_history_clean(paths)`
+- `load_contract_history(paths, required=False)`
 - `load_long_term_training(paths)`
 
 ### Notable Details
@@ -335,10 +335,6 @@ complete without using seasons beyond the available data.
 - Assigns short-term performance split labels.
 - Uses start-year comparison for the train period.
 
-`assign_salary_temporal_split(season)`
-
-- Assigns salary split labels from explicit season sets.
-
 `assign_long_term_temporal_split(season)`
 
 - Assigns long-term anchor split labels.
@@ -366,8 +362,8 @@ test_df = df[df["split"].eq("test")]
 ### Main Responsibility
 
 `features_role.py` builds player-season role features by combining season-level
-stats with player metadata. The output is used by similarity search, salary
-modeling, long-term modeling, and scouting signals.
+stats with player metadata. The output is used by similarity search, long-term
+modeling, recommendations, and scouting signals.
 
 ### Important Constants
 
@@ -506,24 +502,21 @@ PTS/AST/REB over games t+1 through t+5.
 - The current implementation builds complete supervised rows for all three
   targets together.
 
-## `src/dataset/features_salary.py`
+## `src/dataset/features_compensation.py`
 
 ### Main Responsibility
 
-`features_salary.py` builds a salary modeling table by merging player-season
-salaries, salary cap context, player metadata, and role features.
+`features_compensation.py` builds a clean player salary history table by merging
+player-season salaries, salary cap context, and player IDs.
 
 ### Important Constants
 
-`SALARY_MODEL_FEATURES`
-
-- Role and performance features considered useful for salary modeling.
-- Includes workload, usage, production rates, efficiency, defense proxies, and
-  composite role dimensions.
+There are no salary modeling feature constants in the local pipeline. Salary
+history is retained as reference data.
 
 ### Important Functions
 
-`build_salary_training(salaries, salary_cap, players, role_features)`
+`build_player_salary_history(salaries, salary_cap, players)`
 
 - Parses `salary_usd` when it is stored as text.
 - Normalizes team abbreviations into `team_id`.
@@ -533,18 +526,11 @@ salaries, salary cap context, player metadata, and role features.
 
 ```python
 salary_cap_share = salary_usd / salary_cap_usd
-target_salary_usd = salary_usd
 ```
 
-- Merges player metadata by normalized player name key.
-- Computes age from `birth_date` and season start date when available.
-- Merges role features by `player_id` and `season_label`.
-- Resolves duplicated bio columns after role merge.
-- Adds missing flags for salary, cap, cap share, and model features.
-- Fills numeric missing values with medians.
-- Fills categorical missing values with `UNK`.
-- Assigns salary split labels with `assign_salary_temporal_split`.
-- Drops helper columns such as `player_name_key` and merged `season`.
+- Merges `player_id` from player metadata by normalized player name key when
+  salary rows do not already contain player IDs.
+- Drops helper columns from the final output.
 
 ### Output Grain
 
@@ -552,11 +538,7 @@ One row per player-season salary record.
 
 ### Notable Details
 
-- `salary_cap_share` is the preferred normalized salary target because salary
-  cap changes make raw USD salaries difficult to compare across seasons.
-- The current local implementation assigns split labels but does not filter out
-  `ignore` rows before returning. Filtering can be added for stricter
-  consistency with short-term and long-term builders.
+- `salary_cap_share` is retained only for reporting and cross-season context.
 - Name-based player joins are fragile; player IDs should be preferred whenever
   reliable source IDs are available.
 
@@ -679,7 +661,7 @@ gold layer should be rebuilt from canonical source inputs.
 - Loads source datasets through `loaders.py`.
 - Builds role features.
 - Builds short-term performance training data.
-- Builds salary training data.
+- Builds clean salary history for player detail context.
 - Builds long-term forecasting data.
 - Saves all outputs to `paths.gold_dir`.
 - Returns a dictionary of output dataframes.
@@ -689,7 +671,7 @@ gold layer should be rebuilt from canonical source inputs.
 ```text
 player_role_features_clean.parquet
 performance_training_clean.parquet
-salary_training_clean.parquet
+player_salary_history_clean.parquet
 long_term_player_forecast_training.parquet
 ```
 
@@ -711,7 +693,7 @@ For code review or onboarding, read the files in this order:
 3. src/dataset/splits.py
 4. src/dataset/features_role.py
 5. src/dataset/features_performance.py
-6. src/dataset/features_salary.py
+6. src/dataset/features_compensation.py
 7. src/dataset/features_long_term.py
 8. src/dataset/pipeline.py
 ```
@@ -744,8 +726,8 @@ Keep the existing modeling decisions:
 - Keep per-100 possession experiments as comparison artifacts, but do not replace
   per-36 unless evaluation clearly improves.
 - Keep short-term next-five-game forecasting targets for PTS, AST, and REB.
-- Keep salary forecasting focused on salary-cap-normalized targets such as
-  salary cap share and salary-cap-share delta.
+- Keep salary and contract history as reference context, not as a forecasting
+  target.
 
 Promote these `04_scouting_signals.ipynb` artifacts later if the local app needs
 scout-facing signals with low model risk:

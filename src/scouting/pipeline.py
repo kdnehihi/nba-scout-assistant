@@ -5,8 +5,8 @@ import pandas as pd
 from dataset.loaders import (
     DataPaths,
     load_performance_training_clean,
+    load_player_salary_history_clean,
     load_role_features_clean,
-    load_salary_training_clean,
 )
 from evaluation.evaluate_similarity import build_profile_clusters, recommendation_cluster_agreement
 
@@ -20,13 +20,13 @@ def build_all_scouting_artifacts(paths: DataPaths, example_queries: list[dict[st
     """Build and persist deterministic scouting artifacts in the gold layer."""
     performance = load_performance_training_clean(paths)
     role_features = load_role_features_clean(paths)
-    salary = load_salary_training_clean(paths)
+    salary_history = load_player_salary_history_clean(paths)
 
     trend_signals = build_player_trend_signals(performance)
     consistency_signals = build_player_consistency_signals(performance)
     floor_ceiling_signals = build_short_term_floor_ceiling_signals(performance)
     floor_ceiling_evaluation = evaluate_floor_ceiling_signals(floor_ceiling_signals)
-    recommendation_base = build_recommendation_base(role_features, salary, performance)
+    recommendation_base = build_recommendation_base(role_features, performance_df=performance)
     recommendation_clusters = build_profile_clusters(
         recommendation_base,
         features=ALL_RECOMMENDER_FEATURES,
@@ -39,6 +39,7 @@ def build_all_scouting_artifacts(paths: DataPaths, example_queries: list[dict[st
         "short_term_floor_ceiling_evaluation": floor_ceiling_evaluation,
         "player_recommendation_base": recommendation_base,
         "player_recommendation_profile_clusters": recommendation_clusters,
+        "player_salary_history_context": salary_history,
     }
 
     if example_queries:
