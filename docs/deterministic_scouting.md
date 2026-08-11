@@ -12,6 +12,7 @@ The deterministic layer currently covers:
 - player consistency and volatility signals
 - short-term expected/floor/ceiling ranges
 - replacement candidate ranking
+- recommendation ground-truth proxy evaluation
 - compensation context for player detail pages
 
 The goal is to keep these signals simple, auditable, and low-risk. When a
@@ -402,6 +403,68 @@ not as:
 ```text
 equivalent player quality
 ```
+
+## Recommendation Ground Truth Proxy
+
+### Purpose
+
+The project does not have human-labeled player-comparison data. To make
+recommendation quality auditable, the local evaluation layer builds a proxy
+ground truth from future outcomes.
+
+The proxy answers:
+
+```text
+If the recommendation is made at season t, did it retrieve players whose
+season t+1 profile became similar to the target player's season t+1 profile?
+```
+
+The local implementation is:
+
+```text
+src/evaluation/evaluate_similarity.py
+```
+
+The main functions are:
+
+```python
+build_future_similarity_ground_truth(...)
+evaluate_recommendations_against_ground_truth(...)
+```
+
+### Label Construction
+
+For every target player-season:
+
+1. Find the same player's next-season row.
+2. Find candidate players from the same anchor season.
+3. Compare target and candidate next-season profiles using standardized role
+   and physical features.
+4. Mark the closest `relevant_n` candidates as proxy-relevant.
+
+This creates labels such as:
+
+```text
+target_player_id
+target_season
+candidate_player_id
+future_relevance_rank
+future_similarity_score
+```
+
+### Metrics
+
+The recommendation output is evaluated with:
+
+- `hit_rate`: share of returned top-K recommendations that are proxy-relevant.
+- `recall_at_k`: share of proxy-relevant players recovered in the top-K list.
+- `mrr`: reciprocal rank of the first proxy-relevant recommendation.
+
+### Limitations
+
+This is not a scout-labeled ground truth. It is a future-outcome proxy. It is
+useful for sanity checks and model comparison, but final recommendation quality
+should still be reviewed qualitatively on known player cases.
 
 ## Compensation Context
 

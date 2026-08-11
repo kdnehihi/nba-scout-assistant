@@ -8,7 +8,12 @@ from dataset.loaders import (
     load_player_salary_history_clean,
     load_role_features_clean,
 )
-from evaluation.evaluate_similarity import build_profile_clusters, recommendation_cluster_agreement
+from evaluation.evaluate_similarity import (
+    build_future_similarity_ground_truth,
+    build_profile_clusters,
+    evaluate_recommendations_against_ground_truth,
+    recommendation_cluster_agreement,
+)
 
 from .ranges import build_short_term_floor_ceiling_signals, evaluate_floor_ceiling_signals
 from .recommendation import ALL_RECOMMENDER_FEATURES, build_recommendation_base, recommend_players
@@ -31,6 +36,10 @@ def build_all_scouting_artifacts(paths: DataPaths, example_queries: list[dict[st
         recommendation_base,
         features=ALL_RECOMMENDER_FEATURES,
     )
+    recommendation_ground_truth = build_future_similarity_ground_truth(
+        recommendation_base,
+        features=ALL_RECOMMENDER_FEATURES,
+    )
 
     outputs = {
         "player_trend_signals": trend_signals,
@@ -39,6 +48,7 @@ def build_all_scouting_artifacts(paths: DataPaths, example_queries: list[dict[st
         "short_term_floor_ceiling_evaluation": floor_ceiling_evaluation,
         "player_recommendation_base": recommendation_base,
         "player_recommendation_profile_clusters": recommendation_clusters,
+        "player_recommendation_ground_truth": recommendation_ground_truth,
         "player_salary_history_context": salary_history,
     }
 
@@ -48,7 +58,18 @@ def build_all_scouting_artifacts(paths: DataPaths, example_queries: list[dict[st
         for query in example_queries:
             recommendations = recommend_players(recommendation_base, **query)
             examples.append(recommendations)
-            diagnostics.append(recommendation_cluster_agreement(recommendations, recommendation_clusters))
+            diagnostics.append(
+                {
+                    **recommendation_cluster_agreement(recommendations, recommendation_clusters),
+                    **{
+                        f"ground_truth_{key}": value
+                        for key, value in evaluate_recommendations_against_ground_truth(
+                            recommendations,
+                            recommendation_ground_truth,
+                        ).items()
+                    },
+                }
+            )
         if examples:
             outputs["player_recommendation_examples"] = pd.concat(examples, ignore_index=True)
         if diagnostics:

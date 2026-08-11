@@ -122,3 +122,137 @@ def recommendation_cluster_agreement(
         "same_cluster_rate": float(same_cluster.mean()) if len(recs) else np.nan,
         "target_cluster_size": float(target_cluster_size),
     }
+
+
+def _season_start_year(season: object) -> int | None:
+    # Parse the start year from an NBA season label such as 2023-24.
+    """Return the start year from a season label."""
+    try:
+        return int(str(season)[:4])
+    except (TypeError, ValueError):
+        return None
+
+
+def build_future_similarity_ground_truth(
+    base_df: pd.DataFrame,
+    features: list[str] | tuple[str, ...],
+    relevant_n: int = 5,
+    same_position_group: bool = True,
+    minutes_min: float | None = 500,
+) -> pd.DataFrame:
+    # Label relevant recommendations by next-season profile similarity.
+    """Return proxy ground-truth top-N similar outcomes for each player-season."""
+    if relevant_n < 1:
+        raise ValueError("relevant_n must be at least 1.")
+
+    available = [feature for feature in features if feature in base_df.columns]
+    if not available:
+        raise ValueError("No ground-truth features were available.")
+
+    current = base_df.copy()
+    current["season_start_year"] = current["season"].map(_season_start_year)
+    future = current[
+        ["player_id", "season_start_year", *available]
+    ].rename(columns={feature: f"future_{feature}" for feature in available})
+    future["season_start_year"] = future["season_start_year"] - 1
+
+    labeled = current.merge(
+        future,
+        on=["player_id", "season_start_year"],
+        how="inner",
+    )
+    if minutes_min is not None and "minutes" in labeled.columns:
+        labeled = labeled[labeled["minutes"].fillna(0) >= minutes_min].copy()
+
+    future_features = [f"future_{feature}" for feature in available]
+    rows = []
+    for (_, season), season_df in labeled.groupby(["season_start_year", "season"], sort=False):
+        season_df = season_df.reset_index(drop=True)
+        if len(season_df) < 2:
+            continue
+        matrix = season_df[future_features].apply(pd.to_numeric, errors="coerce")
+        matrix = matrix.fillna(matrix.median(numeric_only=True)).fillna(0)
+        scaled = StandardScaler().fit_transform(matrix)
+
+        for target_idx, target in season_df.iterrows():
+            candidates = season_df[season_df["player_id"].ne(target["player_id"])].copy()
+            candidate_indices = candidates.index.to_numpy()
+            if same_position_group and "position_group" in season_df.columns:
+                candidates = candidates[candidates["position_group"].eq(target.get("position_group"))].copy()
+                candidate_indices = candidates.index.to_numpy()
+            if len(candidate_indices) == 0:
+                continue
+
+            distances = np.sqrt(((scaled[candidate_indices] - scaled[target_idx]) ** 2).mean(axis=1))
+            candidate_rows = candidates.copy()
+            candidate_rows["future_similarity_distance"] = distances
+            candidate_rows["future_similarity_score"] = 1 / (1 + candidate_rows["future_similarity_distance"])
+            candidate_rows = candidate_rows.sort_values("future_similarity_distance").head(relevant_n)
+            for rank, (_, candidate) in enumerate(candidate_rows.iterrows(), start=1):
+                rows.append(
+                    {
+                        "target_player_id": target["player_id"],
+                        "target_player_name": target["player_name"],
+                        "target_season": target["season"],
+                        "player_id": candidate["player_id"],
+                        "player_name": candidate["player_name"],
+                        "season": candidate["season"],
+                        "future_relevance_rank": rank,
+                        "future_similarity_distance": candidate["future_similarity_distance"],
+                        "future_similarity_score": candidate["future_similarity_score"],
+                        "ground_truth_features": ", ".join(available),
+                    }
+                )
+
+    return pd.DataFrame(rows)
+
+
+def evaluate_recommendations_against_ground_truth(
+    recommendations: pd.DataFrame,
+    ground_truth: pd.DataFrame,
+    top_n: int = 5,
+) -> dict[str, float]:
+    # Evaluate top-K recommendations against future-outcome proxy labels.
+    """Return hit-rate and reciprocal-rank metrics for one recommendation result."""
+    if recommendations.empty:
+        return {
+            "rows": 0.0,
+            "top_n": float(top_n),
+            "relevant_count": 0.0,
+            "hit_count": 0.0,
+            "hit_rate": float("nan"),
+            "recall_at_k": float("nan"),
+            "mrr": float("nan"),
+        }
+
+    recs = recommendations.head(top_n).copy()
+    target_player_id = recs["target_player_id"].iloc[0]
+    target_season = recs["target_season"].iloc[0]
+    truth = ground_truth[
+        ground_truth["target_player_id"].eq(target_player_id)
+        & ground_truth["target_season"].eq(target_season)
+    ].copy()
+    if truth.empty:
+        return {
+            "rows": float(len(recs)),
+            "top_n": float(top_n),
+            "relevant_count": 0.0,
+            "hit_count": 0.0,
+            "hit_rate": float("nan"),
+            "recall_at_k": float("nan"),
+            "mrr": float("nan"),
+        }
+
+    truth_keys = set(zip(truth["player_id"], truth["season"]))
+    rec_keys = list(zip(recs["player_id"], recs["season"]))
+    hit_positions = [idx for idx, key in enumerate(rec_keys, start=1) if key in truth_keys]
+    hit_count = len(hit_positions)
+    return {
+        "rows": float(len(recs)),
+        "top_n": float(top_n),
+        "relevant_count": float(len(truth_keys)),
+        "hit_count": float(hit_count),
+        "hit_rate": float(hit_count / len(recs)) if len(recs) else np.nan,
+        "recall_at_k": float(hit_count / len(truth_keys)) if truth_keys else np.nan,
+        "mrr": float(1 / min(hit_positions)) if hit_positions else 0.0,
+    }

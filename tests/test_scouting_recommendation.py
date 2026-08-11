@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import pandas as pd
 
-from evaluation.evaluate_similarity import build_profile_clusters, recommendation_cluster_agreement
+from evaluation.evaluate_similarity import (
+    build_future_similarity_ground_truth,
+    build_profile_clusters,
+    evaluate_recommendations_against_ground_truth,
+    recommendation_cluster_agreement,
+)
 from scouting.recommendation import (
     ALL_RECOMMENDER_FEATURES,
     build_recommendation_base,
@@ -77,6 +82,29 @@ def test_profile_cluster_agreement_diagnostic_runs_on_recommendations():
     assert diagnostics["rows"] == 2.0
     assert 0.0 <= diagnostics["same_cluster_rate"] <= 1.0
     assert diagnostics["target_cluster_size"] >= 1.0
+
+
+def test_future_similarity_ground_truth_scores_recommendation_hits():
+    current = sample_role_features()
+    future = current.copy()
+    future["season"] = "2025-26"
+    future.loc[future["player_name"].eq("Target Guard"), ["points_per_100", "assists_per_100"]] = [34, 9]
+    future.loc[future["player_name"].eq("Similar Guard"), ["points_per_100", "assists_per_100"]] = [33.8, 8.8]
+    future.loc[future["player_name"].eq("Different Guard"), ["points_per_100", "assists_per_100"]] = [18, 3]
+    base = build_recommendation_base(pd.concat([current, future], ignore_index=True))
+
+    recommendations = recommend_players(base, "Target Guard", season="2024-25", top_n=2, minutes_min=500)
+    ground_truth = build_future_similarity_ground_truth(
+        base,
+        features=ALL_RECOMMENDER_FEATURES,
+        relevant_n=2,
+        minutes_min=500,
+    )
+    metrics = evaluate_recommendations_against_ground_truth(recommendations, ground_truth, top_n=2)
+
+    assert "Similar Guard" in ground_truth["player_name"].tolist()
+    assert metrics["hit_count"] >= 1.0
+    assert 0.0 <= metrics["recall_at_k"] <= 1.0
 
 
 def test_position_group_maps_common_position_shapes():
