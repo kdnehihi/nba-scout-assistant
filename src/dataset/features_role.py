@@ -40,7 +40,7 @@ def add_role_dimensions(df: pd.DataFrame) -> pd.DataFrame:
     )
     result["playmaking"] = (
         result["assists_per_100"] * 0.70
-        + (1 - result["turnover_rate"].clip(0, 1)) * 5 * 0.30
+        - result["turnover_rate"].clip(0, 1) * 5 * 0.30
     )
     result["shooting"] = (
         result["true_shooting_pct"] * 0.65

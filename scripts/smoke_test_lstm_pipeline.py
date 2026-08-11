@@ -75,7 +75,7 @@ def create_fake_raw_nba_data(
                     "min": minutes,
                     "min_season_avg": season_avg_min,
                     # Fake future target
-                    "target_next_5_pts": pts + np.random.normal(0, 3),
+                    "target_next_5_pts_avg": pts + np.random.normal(0, 3),
                     "split": "train" if game_id < 30 else "test",
                 }
             )
@@ -92,7 +92,7 @@ def main():
     print(raw_df.shape)
 
 
-    config = LSTM_TASK_CONFIG["pts"]
+    config = LSTM_TASK_CONFIG["points"]
 
 
     print("\n2. Prepare sequence dataframe")
