@@ -13,6 +13,7 @@ from scouting.recommendation import (
     build_recommendation_base,
     position_group,
     recommend_players,
+    select_target_row,
 )
 
 
@@ -65,6 +66,16 @@ def test_recommend_players_returns_grouped_explanations():
     assert recommendations["player_name"].iloc[0] == "Similar Guard"
     assert "matched groups" in recommendations["recommendation_reason"].iloc[0]
     assert recommendations["position_group"].eq("guard").all()
+
+
+def test_select_target_row_uses_normalized_player_name():
+    role_features = sample_role_features()
+    role_features.loc[0, "player_name"] = "Luka Dončić"
+    base = build_recommendation_base(role_features)
+
+    target = select_target_row(base, player_name="luka doncic", season="2024-25")
+
+    assert target["player_id"] == 1
 
 
 def test_profile_cluster_agreement_diagnostic_runs_on_recommendations():

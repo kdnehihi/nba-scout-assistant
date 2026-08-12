@@ -16,6 +16,8 @@ from dataset.cleaning import (
 def test_basic_cleaning_helpers():
     assert to_snake_case("Player Name!") == "player_name"
     assert normalize_name_key("LeBron James Jr.") == "lebronjamesjr"
+    assert normalize_name_key("Luka Dončić") == "lukadoncic"
+    assert normalize_name_key("Nikola Jokić") == "nikolajokic"
     assert normalize_team_abbreviation("BRK") == "BKN"
     assert parse_salary("$12,345,678") == 12345678
     assert normalize_season("2023-24") == (2023, 2024, "2023-24")

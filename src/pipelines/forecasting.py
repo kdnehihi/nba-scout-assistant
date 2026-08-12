@@ -9,7 +9,8 @@ import torch
 from scipy import sparse
 
 from src.config.long_term_config import LongTermTaskConfig
-from src.dataset.loaders import load_long_term_training, load_performance_training_clean, resolve_data_paths
+from src.dataset.cleaning import normalize_name_key
+from src.dataset.loaders import load_long_term_inference, load_performance_training_clean, load_players, resolve_data_paths
 from src.dataset.sequence import make_lstm_delta_inference_window
 from src.evaluation.evaluate_long_term import predict_mlp_long_term, predict_sklearn_long_term
 from src.pipelines.artifacts import LongTermModelArtifact, ShortTermModelArtifact
@@ -23,12 +24,21 @@ def _filter_player_rows(
     player_id: int | str | None = None,
     player_name: str | None = None,
 ) -> pd.DataFrame:
-    # Select player rows by ID when available, otherwise by case-insensitive exact name.
+    # Select player rows by ID when available, otherwise by normalized player name.
     """Return rows for one requested player."""
     if player_id is not None and "player_id" in df.columns:
         return df[df["player_id"].astype(str).eq(str(player_id))].copy()
     if player_name is not None and "player_name" in df.columns:
-        return df[df["player_name"].astype(str).str.casefold().eq(player_name.casefold())].copy()
+        player_key = normalize_name_key(player_name)
+        name_keys = (
+            df["player_name_key"]
+            if "player_name_key" in df.columns
+            else df["player_name"].map(normalize_name_key)
+        )
+        mask = name_keys.eq(player_key)
+        if not mask.any() and player_key:
+            mask = name_keys.fillna("").str.contains(player_key, regex=False)
+        return df[mask].copy()
     raise ValueError("player_id or player_name is required.")
 
 
@@ -130,7 +140,15 @@ def predict_short_term_tasks(
 def load_short_term_prediction_data(data_dir: Path | str = "data") -> pd.DataFrame:
     # Load clean short-term gold data for inference window selection.
     """Load short-term prediction source data from the gold layer."""
-    return load_performance_training_clean(resolve_data_paths(data_dir))
+    paths = resolve_data_paths(data_dir)
+    performance = load_performance_training_clean(paths)
+    if "player_name" not in performance.columns and "player_id" in performance.columns:
+        players = load_players(paths)
+        player_lookup = players[["player_id", "player_name"]].drop_duplicates("player_id")
+        performance = performance.merge(player_lookup, on="player_id", how="left")
+    if "player_name" in performance.columns and "player_name_key" not in performance.columns:
+        performance["player_name_key"] = performance["player_name"].map(normalize_name_key)
+    return performance
 
 
 def _select_long_term_anchor_row(
@@ -237,6 +255,6 @@ def predict_long_term_tasks(
 
 
 def load_long_term_prediction_data(data_dir: Path | str = "data") -> pd.DataFrame:
-    # Load clean long-term gold data for anchor-row selection.
+    # Load long-term inference anchors, not target-complete training anchors.
     """Load long-term prediction source data from the gold layer."""
-    return load_long_term_training(resolve_data_paths(data_dir))
+    return load_long_term_inference(resolve_data_paths(data_dir), build_if_missing=True)

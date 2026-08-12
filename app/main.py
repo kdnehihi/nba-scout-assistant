@@ -5,6 +5,7 @@ from typing import Literal
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field, model_validator
 
+from src.api_utils import json_safe
 from src.pipelines.artifacts import (
     load_long_term_model_artifacts,
     load_short_term_model_artifacts,
@@ -116,12 +117,14 @@ def health() -> dict[str, str]:
 
 @app.get("/metadata")
 def metadata():
-    return build_service_metadata(
-        recommendation_data=app.state.recommendation_data,
-        performance_df=app.state.short_term_data,
-        long_term_df=app.state.long_term_data,
-        short_term_models=app.state.short_term_models,
-        long_term_models=app.state.long_term_models,
+    return json_safe(
+        build_service_metadata(
+            recommendation_data=app.state.recommendation_data,
+            performance_df=app.state.short_term_data,
+            long_term_df=app.state.long_term_data,
+            short_term_models=app.state.short_term_models,
+            long_term_models=app.state.long_term_models,
+        )
     )
 
 
@@ -143,10 +146,12 @@ def recommendations(request: RecommendationRequest):
             recommendations=recs,
             top_n=request.top_n,
         )
-        return {
-            "recommendations": recs.to_dict("records"),
-            "diagnostics": diagnostics,
-        }
+        return json_safe(
+            {
+                "recommendations": recs,
+                "diagnostics": diagnostics,
+            }
+        )
     except (KeyError, ValueError) as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
@@ -163,7 +168,7 @@ def short_term_forecast(request: PredictShortTermRequest):
             season=request.season,
             as_of_date=request.as_of_date,
         )
-        return {"predictions": predictions}
+        return json_safe({"predictions": predictions})
     except (KeyError, ValueError) as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
@@ -180,7 +185,7 @@ def long_term_forecast(request: PredictLongTermRequest):
             player_name=request.player_name,
             anchor_season=request.anchor_season,
         )
-        return {"predictions": predictions}
+        return json_safe({"predictions": predictions})
     except (KeyError, ValueError) as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
@@ -188,21 +193,23 @@ def long_term_forecast(request: PredictLongTermRequest):
 @app.post("/players/scouting-report")
 def scouting_report(request: ScoutingReportRequest):
     try:
-        return build_player_scouting_report(
-            recommendation_data=app.state.recommendation_data,
-            performance_df=app.state.short_term_data,
-            long_term_df=app.state.long_term_data,
-            short_term_models=app.state.short_term_models,
-            long_term_models=app.state.long_term_models,
-            player_id=request.player_id,
-            player_name=request.player_name,
-            season=request.season,
-            anchor_season=request.anchor_season,
-            as_of_date=request.as_of_date,
-            short_term_tasks=request.short_term_tasks,
-            long_term_tasks=request.long_term_tasks,
-            long_term_horizons=request.long_term_horizons,
-            include_forecasts=request.include_forecasts,
+        return json_safe(
+            build_player_scouting_report(
+                recommendation_data=app.state.recommendation_data,
+                performance_df=app.state.short_term_data,
+                long_term_df=app.state.long_term_data,
+                short_term_models=app.state.short_term_models,
+                long_term_models=app.state.long_term_models,
+                player_id=request.player_id,
+                player_name=request.player_name,
+                season=request.season,
+                anchor_season=request.anchor_season,
+                as_of_date=request.as_of_date,
+                short_term_tasks=request.short_term_tasks,
+                long_term_tasks=request.long_term_tasks,
+                long_term_horizons=request.long_term_horizons,
+                include_forecasts=request.include_forecasts,
+            )
         )
     except (KeyError, ValueError) as error:
         raise HTTPException(status_code=404, detail=str(error)) from error

@@ -13,7 +13,7 @@ from src.dataset.sequence import make_lstm_delta_inference_window
 from src.modeling.long_term_baseline import build_long_term_preprocessor
 from src.models.lstm import ShortTermLSTM
 from src.pipelines.artifacts import LongTermModelArtifact, ShortTermModelArtifact
-from src.pipelines.forecasting import predict_long_term_task, predict_long_term_tasks, predict_short_term_task, predict_short_term_tasks
+from src.pipelines.forecasting import _filter_player_rows, predict_long_term_task, predict_long_term_tasks, predict_short_term_task, predict_short_term_tasks
 
 
 def make_short_term_artifact(task: str = "points") -> ShortTermModelArtifact:
@@ -84,6 +84,17 @@ def test_predict_short_term_tasks_filters_requested_tasks():
     predictions = predict_short_term_tasks(rows, artifacts, tasks=["points"], player_name="Player One", device="cpu")
 
     assert set(predictions) == {"points"}
+
+
+def test_filter_player_rows_requires_name_column_for_name_lookup():
+    rows = make_short_term_rows().drop(columns=["player_name"])
+
+    try:
+        _filter_player_rows(rows, player_name="Player One")
+    except ValueError as error:
+        assert "player_id or player_name is required" in str(error)
+    else:
+        raise AssertionError("Expected missing name lookup to fail.")
 
 
 def make_long_term_rows() -> pd.DataFrame:

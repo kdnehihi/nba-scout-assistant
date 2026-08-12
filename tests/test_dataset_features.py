@@ -3,7 +3,7 @@ from __future__ import annotations
 import pandas as pd
 
 from dataset.features_compensation import build_player_salary_history
-from dataset.features_long_term import build_long_term_training
+from dataset.features_long_term import build_long_term_inference, build_long_term_training
 from dataset.features_performance import build_performance_training
 from dataset.features_role import build_role_features
 
@@ -139,3 +139,12 @@ def test_build_long_term_training_creates_horizon_targets():
         "split",
     }.issubset(long_term.columns)
     assert set(long_term["split"]).issubset({"train", "validation", "test"})
+
+
+def test_build_long_term_inference_keeps_latest_anchor_without_targets():
+    inference = build_long_term_inference(sample_game_logs(), sample_players(), sample_season_stats())
+
+    assert "anchor_season" in inference.columns
+    assert "active_h1" not in inference.columns
+    assert "split" not in inference.columns
+    assert inference["anchor_season_start_year"].max() >= 2022

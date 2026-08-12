@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
+from src.dataset.cleaning import normalize_name_key
+
 
 STAT_FEATURE_GROUPS: dict[str, list[str]] = {
     "workload": [
@@ -138,6 +140,7 @@ def build_recommendation_base(
     base = role_df.copy()
     base["season_start_year"] = base["season"].map(season_start_year)
     base["position_group"] = base["position"].map(position_group)
+    base["player_name_key"] = base["player_name"].map(normalize_name_key)
 
     if physical_df is not None and not physical_df.empty:
         physical_context = physical_context_by_player_season(physical_df)
@@ -188,7 +191,15 @@ def select_target_row(
     season: str | None = None,
 ) -> pd.Series:
     """Select one target player-season row for a recommendation query."""
-    mask = base_df["player_name"].str.contains(player_name, case=False, na=False, regex=False)
+    player_key = normalize_name_key(player_name)
+    name_keys = (
+        base_df["player_name_key"]
+        if "player_name_key" in base_df.columns
+        else base_df["player_name"].map(normalize_name_key)
+    )
+    mask = name_keys.eq(player_key)
+    if not mask.any() and player_key:
+        mask = name_keys.fillna("").str.contains(player_key, regex=False)
     if season is not None:
         mask &= base_df["season"].eq(season)
     matches = base_df[mask].sort_values(["season_start_year", "minutes"], ascending=[False, False])

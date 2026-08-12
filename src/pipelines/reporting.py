@@ -4,6 +4,8 @@ from typing import Any
 
 import pandas as pd
 
+from src.api_utils import json_safe
+from src.dataset.cleaning import normalize_name_key
 from src.pipelines.forecasting import predict_long_term_tasks, predict_short_term_tasks
 from src.pipelines.recommendation import RecommendationPipelineData, build_recommended_player_detail
 
@@ -12,7 +14,7 @@ def _json_records(df: pd.DataFrame, limit: int | None = None) -> list[dict[str, 
     # Convert dataframe slices to JSON-compatible records.
     """Return dataframe records with missing values converted to None."""
     records_df = df.head(limit).copy() if limit is not None else df.copy()
-    return records_df.where(pd.notna(records_df), None).to_dict("records")
+    return json_safe(records_df)
 
 
 def _filter_player_rows(
@@ -20,14 +22,23 @@ def _filter_player_rows(
     player_id: int | str | None = None,
     player_name: str | None = None,
 ) -> pd.DataFrame:
-    # Select player rows by ID when available, otherwise by exact case-insensitive name.
+    # Select player rows by ID when available, otherwise by normalized player name.
     """Return rows for one player request."""
     if df.empty:
         return df.copy()
     if player_id is not None and "player_id" in df.columns:
         return df[df["player_id"].astype(str).eq(str(player_id))].copy()
     if player_name is not None and "player_name" in df.columns:
-        return df[df["player_name"].astype(str).str.casefold().eq(player_name.casefold())].copy()
+        player_key = normalize_name_key(player_name)
+        name_keys = (
+            df["player_name_key"]
+            if "player_name_key" in df.columns
+            else df["player_name"].map(normalize_name_key)
+        )
+        mask = name_keys.eq(player_key)
+        if not mask.any() and player_key:
+            mask = name_keys.fillna("").str.contains(player_key, regex=False)
+        return df[mask].copy()
     raise ValueError("player_id or player_name is required.")
 
 

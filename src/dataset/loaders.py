@@ -186,3 +186,24 @@ def load_long_term_training(paths: DataPaths) -> pd.DataFrame:
     # Read the materialized long-term training table from the gold layer.
     """Load clean long-term player forecast training data from the gold layer."""
     return load_tabular_data(paths.gold_dir / "long_term_player_forecast_training.parquet")
+
+
+def load_long_term_inference(paths: DataPaths, build_if_missing: bool = True) -> pd.DataFrame:
+    # Read or build long-term prediction anchors that do not require future target labels.
+    """Load long-term player forecast inference data from the gold layer."""
+    path = paths.gold_dir / "long_term_player_forecast_inference.parquet"
+    if path.exists():
+        return load_tabular_data(path)
+    if not build_if_missing:
+        return load_tabular_data(path)
+
+    from .features_long_term import build_long_term_inference
+
+    inference = build_long_term_inference(
+        game_logs=load_player_game_logs(paths),
+        players=load_players(paths),
+        season_stats=load_player_season_stats(paths),
+    )
+    paths.gold_dir.mkdir(parents=True, exist_ok=True)
+    inference.to_parquet(path, index=False)
+    return inference

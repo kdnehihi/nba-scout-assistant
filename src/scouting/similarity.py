@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
+from src.dataset.cleaning import normalize_name_key
+
 from .config import SimilarityConfig
 from .signals import season_start_year
 
@@ -46,7 +48,11 @@ def find_replacement_candidates(
     """Return replacement candidates for a player-season query."""
     base = base_df.copy()
     position_filter = config.same_position_group if same_position_group is None else same_position_group
-    name_mask = base["player_name"].str.contains(player_name, case=False, na=False, regex=False)
+    player_key = normalize_name_key(player_name)
+    name_keys = base["player_name"].map(normalize_name_key)
+    name_mask = name_keys.eq(player_key)
+    if not name_mask.any() and player_key:
+        name_mask = name_keys.fillna("").str.contains(player_key, regex=False)
     if season is not None:
         name_mask &= base["season"].eq(season)
     target_rows = base[name_mask].sort_values(["season_start_year", "minutes"], ascending=[False, False])
@@ -110,4 +116,3 @@ def find_replacement_candidates(
         "features_used",
     ]
     return candidates[output_cols].sort_values("similarity_distance").head(top_n).reset_index(drop=True)
-

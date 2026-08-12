@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 
 import numpy as np
 import pandas as pd
@@ -27,11 +28,13 @@ def to_snake_case(column: object) -> str:
 
 def normalize_name_key(value: object) -> str | None:
     # Create a stable player-name key for fallback joins.
-    # Example: "LeBron James Jr." -> "lebronjamesjr".
+    # Example: "Luka Dončić Jr." -> "lukadoncicjr".
     """Normalize a player name for cross-source joins."""
     if pd.isna(value):
         return None
-    return re.sub(r"[^a-z0-9]", "", str(value).lower())
+    text = unicodedata.normalize("NFKD", str(value))
+    text = text.encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"[^a-z0-9]", "", text.lower())
 
 
 def normalize_team_abbreviation(value: object) -> str | None:

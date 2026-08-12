@@ -356,3 +356,28 @@ def build_long_term_training(
     long_term["split"] = long_term["anchor_season"].map(assign_long_term_temporal_split)
     long_term = long_term[long_term["split"].isin(["train", "validation", "test"])].copy()
     return long_term.sort_values(["anchor_season_start_year", "player_id"]).reset_index(drop=True)
+
+
+def build_long_term_inference(
+    game_logs: pd.DataFrame,
+    players: pd.DataFrame,
+    season_stats: pd.DataFrame,
+) -> pd.DataFrame:
+    # Create anchor-time long-term features for prediction without requiring future labels.
+    """Build long-term inference features through the latest available season."""
+    season_summary = build_player_season_summary(game_logs, players, season_stats)
+    recent_features = build_recent_game_anchor_features(game_logs)
+    anchor_features = add_lagged_season_features(season_summary)
+
+    if not recent_features.empty:
+        anchor_features = (
+            anchor_features.merge(
+                recent_features,
+                left_on=["player_id", "anchor_season"],
+                right_on=["player_id", "season"],
+                how="left",
+            )
+            .drop(columns=["season"], errors="ignore")
+        )
+
+    return anchor_features.sort_values(["anchor_season_start_year", "player_id"]).reset_index(drop=True)
