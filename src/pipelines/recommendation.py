@@ -6,7 +6,7 @@ from typing import Any
 
 import pandas as pd
 
-from dataset.loaders import (
+from src.dataset.loaders import (
     DataPaths,
     load_contract_history,
     load_performance_training_clean,
@@ -14,14 +14,14 @@ from dataset.loaders import (
     load_role_features_clean,
     resolve_data_paths,
 )
-from evaluation.evaluate_similarity import (
+from src.evaluation.evaluate_similarity import (
     build_future_similarity_ground_truth,
     build_profile_clusters,
     evaluate_recommendations_against_ground_truth,
     recommendation_cluster_agreement,
 )
-from scouting.compensation import build_player_compensation_context
-from scouting.recommendation import ALL_RECOMMENDER_FEATURES, build_recommendation_base, recommend_players
+from src.scouting.compensation import build_player_compensation_context
+from src.scouting.recommendation import ALL_RECOMMENDER_FEATURES, build_recommendation_base, recommend_players
 
 
 @dataclass(frozen=True)
@@ -166,4 +166,3 @@ def build_recommendation_report(
         "diagnostics": diagnostics,
         "candidate_context": candidate_context,
     }
-

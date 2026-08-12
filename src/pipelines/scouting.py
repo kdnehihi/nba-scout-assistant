@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from dataset.loaders import resolve_data_paths
-from scouting.pipeline import build_all_scouting_artifacts
+from src.dataset.loaders import resolve_data_paths
+from src.scouting.pipeline import build_all_scouting_artifacts
 
 
 def run_scouting_artifact_pipeline(
@@ -16,4 +16,3 @@ def run_scouting_artifact_pipeline(
     """Run the deterministic scouting artifact pipeline."""
     paths = resolve_data_paths(data_dir)
     return build_all_scouting_artifacts(paths, example_queries=example_queries)
-

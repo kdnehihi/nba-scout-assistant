@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from config.long_term_config import LONG_TERM_HORIZONS, LONG_TERM_TASKS
-from training.train_long_term import train_long_term_model, train_long_term_models
-from training.train_short_term import train_short_term
+from src.config.long_term_config import LONG_TERM_HORIZONS, LONG_TERM_TASKS
+from src.training.train_long_term import train_long_term_model, train_long_term_models
+from src.training.train_short_term import train_short_term
 
 
 SHORT_TERM_TASKS = ("points", "assists", "rebounds")
@@ -66,4 +66,3 @@ def run_long_term_training_pipeline(
         for horizon_value in horizons
     ]
     return pd.concat(metrics, ignore_index=True)
-

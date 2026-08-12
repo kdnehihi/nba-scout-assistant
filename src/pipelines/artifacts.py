@@ -7,10 +7,10 @@ from typing import Any
 import joblib
 import torch
 
-from config.long_term_config import LONG_TERM_HORIZONS, LONG_TERM_TASKS, LongTermTaskConfig
-from config.lstm_config import LSTM_TASK_CONFIG, LSTMTaskConfig
-from models.lstm import ShortTermLSTM
-from models.mlp import LongTermMLP
+from src.config.long_term_config import LONG_TERM_HORIZONS, LONG_TERM_TASKS, LongTermTaskConfig
+from src.config.lstm_config import LSTM_TASK_CONFIG, LSTMTaskConfig
+from src.models.lstm import ShortTermLSTM
+from src.models.mlp import LongTermMLP
 
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -180,7 +180,7 @@ def load_long_term_model_artifacts(
     # Load all selected long-term task/horizon artifacts.
     """Load long-term model artifacts keyed by (task, horizon)."""
     if task_configs is None:
-        from config.long_term_config import resolve_long_term_task_config
+        from src.config.long_term_config import resolve_long_term_task_config
 
         task_configs = tuple(
             resolve_long_term_task_config(task, horizon)

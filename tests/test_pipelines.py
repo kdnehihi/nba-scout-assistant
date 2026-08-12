@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import pandas as pd
 
-from evaluation.evaluate_similarity import build_future_similarity_ground_truth, build_profile_clusters
-from pipelines.recommendation import (
+from src.evaluation.evaluate_similarity import build_future_similarity_ground_truth, build_profile_clusters
+from src.pipelines.recommendation import (
     RecommendationPipelineData,
     build_recommended_player_detail,
     evaluate_recommendation_result,
     recommend_similar_players,
 )
-from scouting.recommendation import ALL_RECOMMENDER_FEATURES, build_recommendation_base
+from src.scouting.recommendation import ALL_RECOMMENDER_FEATURES, build_recommendation_base
 from tests.test_scouting_recommendation import sample_role_features
 
 

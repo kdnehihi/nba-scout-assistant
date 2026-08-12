@@ -4,6 +4,56 @@ import numpy as np
 import pandas as pd
 
 
+def make_lstm_delta_inference_window(
+    df: pd.DataFrame,
+    task_config,
+) -> tuple[np.ndarray, np.ndarray, float, pd.Series]:
+    # Build one latest LSTM input window without requiring future targets.
+    """Return X_seq, X_static, baseline, and anchor row for one player history."""
+    required_columns = [
+        "player_id",
+        "season",
+        "as_of_date",
+        "game_id",
+        "min",
+        "min_season_avg",
+        task_config.stat_col,
+        task_config.stat_avg_col,
+    ]
+    missing = set(required_columns) - set(df.columns)
+    if missing:
+        raise KeyError(f"Missing columns: {missing}")
+
+    rows = (
+        df
+        .dropna(subset=required_columns)
+        .sort_values(["player_id", "season", "as_of_date", "game_id"])
+        .copy()
+    )
+    if len(rows) < task_config.sequence_length:
+        raise ValueError(
+            f"Need at least {task_config.sequence_length} player rows; got {len(rows)}."
+        )
+
+    window_df = rows.tail(task_config.sequence_length)
+    anchor = window_df.iloc[-1]
+    sequence = np.column_stack(
+        [
+            window_df[task_config.stat_col].to_numpy(dtype="float32")
+            - window_df[task_config.stat_avg_col].to_numpy(dtype="float32"),
+            window_df["min"].to_numpy(dtype="float32")
+            - window_df["min_season_avg"].to_numpy(dtype="float32"),
+        ]
+    ).astype("float32")
+    static = np.asarray(
+        [[anchor[task_config.stat_avg_col], anchor["min_season_avg"]]],
+        dtype="float32",
+    )
+    X_seq = sequence.reshape(1, task_config.sequence_length, sequence.shape[-1])
+    baseline = float(anchor[task_config.stat_avg_col])
+    return X_seq, static, baseline, anchor
+
+
 def prepare_sequence_training(
     df: pd.DataFrame,
     task_config,

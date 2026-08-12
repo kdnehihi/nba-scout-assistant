@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from dataset.cleaning import normalize_name_key, parse_salary
+from src.dataset.cleaning import normalize_name_key, parse_salary
 
 
 def _name_key_series(values: pd.Series) -> pd.Series:

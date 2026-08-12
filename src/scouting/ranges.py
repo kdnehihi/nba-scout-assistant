@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from evaluation.evaluate_ranges import evaluate_short_term_ranges
+from src.evaluation.evaluate_ranges import evaluate_short_term_ranges
 
 from .config import RangeConfig, STAT_TARGETS
 
@@ -59,4 +59,3 @@ def evaluate_floor_ceiling_signals(signals: pd.DataFrame) -> pd.DataFrame:
     # Evaluate deterministic range outputs against next-five targets.
     """Return split/stat evaluation for short-term floor-ceiling signals."""
     return evaluate_short_term_ranges(signals, STAT_TARGETS)
-

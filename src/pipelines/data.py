@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from dataset.loaders import DataPaths, resolve_data_paths
-from dataset.pipeline import build_all_gold_datasets
+from src.dataset.loaders import DataPaths, resolve_data_paths
+from src.dataset.pipeline import build_all_gold_datasets
 
 
 def run_gold_data_pipeline(data_dir: Path | str = "data") -> dict[str, pd.DataFrame]:
@@ -19,4 +19,3 @@ def resolve_pipeline_data_paths(data_dir: Path | str = "data") -> DataPaths:
     # Centralize path resolution for application pipelines.
     """Return resolved project data paths for pipeline callers."""
     return resolve_data_paths(data_dir)
-

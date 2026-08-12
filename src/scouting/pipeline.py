@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import pandas as pd
 
-from dataset.loaders import (
+from src.dataset.loaders import (
     DataPaths,
     load_performance_training_clean,
     load_player_salary_history_clean,
     load_role_features_clean,
 )
-from evaluation.evaluate_similarity import (
+from src.evaluation.evaluate_similarity import (
     build_future_similarity_ground_truth,
     build_profile_clusters,
     evaluate_recommendations_against_ground_truth,

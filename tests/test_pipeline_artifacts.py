@@ -5,11 +5,11 @@ import numpy as np
 import torch
 from sklearn.preprocessing import StandardScaler
 
-from config.long_term_config import resolve_long_term_task_config
-from config.lstm_config import LSTM_TASK_CONFIG
-from models.lstm import ShortTermLSTM
-from models.mlp import LongTermMLP
-from pipelines.artifacts import (
+from src.config.long_term_config import resolve_long_term_task_config
+from src.config.lstm_config import LSTM_TASK_CONFIG
+from src.models.lstm import ShortTermLSTM
+from src.models.mlp import LongTermMLP
+from src.pipelines.artifacts import (
     load_long_term_model_artifact,
     load_long_term_model_artifacts,
     load_short_term_model_artifact,
