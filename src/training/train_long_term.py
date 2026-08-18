@@ -22,7 +22,12 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.config.long_term_config import LONG_TERM_HORIZONS, LONG_TERM_TASKS, LongTermTaskConfig, resolve_long_term_task_config
+from src.config.long_term_config import (
+    LONG_TERM_HORIZONS,
+    LONG_TERM_TASKS,
+    LongTermTaskConfig,
+    resolve_long_term_task_config,
+)
 from src.dataset.loaders import DataPaths, load_long_term_training, resolve_data_paths
 from src.dataset.long_term import prepare_long_term_modeling_data
 from src.evaluation.evaluate_long_term import (
@@ -30,7 +35,11 @@ from src.evaluation.evaluate_long_term import (
     predict_mlp_long_term,
     predict_sklearn_long_term,
 )
-from src.modeling.long_term_baseline import build_long_term_preprocessor
+from src.modeling.long_term_baseline import (
+    build_long_term_logistic_baseline,
+    build_long_term_preprocessor,
+    build_long_term_ridge_baseline,
+)
 from src.models.mlp import LongTermMLP
 from src.models.randomforest import build_random_forest_classifier, build_random_forest_regressor
 from src.training.mlflow_utils import configure_mlflow, log_metrics_flat, log_params_flat
@@ -59,18 +68,24 @@ def build_long_term_model(task_config: LongTermTaskConfig) -> Any:
             return build_random_forest_classifier(**task_config.model_params)
         return build_random_forest_regressor(**task_config.model_params)
 
+    if task_config.model_family == "ridge":
+        return build_long_term_ridge_baseline(**task_config.model_params)
+
+    if task_config.model_family == "logistic":
+        return build_long_term_logistic_baseline(**task_config.model_params)
+
     if task_config.model_family == "mlp":
         return None
 
     raise ValueError(f"Unsupported long-term model family: {task_config.model_family}")
 
 
-def fit_random_forest_long_term(
+def fit_sklearn_long_term(
     prepared_df: pd.DataFrame,
     feature_cols: list[str],
     task_config: LongTermTaskConfig,
 ) -> tuple[Pipeline, pd.DataFrame]:
-    """Fit the selected random forest pipeline and return validation/test metrics."""
+    """Fit the selected sklearn pipeline and return validation/test metrics."""
     splits = make_supervised_splits(prepared_df, feature_cols, task_config.target_col)
     estimator = build_long_term_model(task_config)
     model = Pipeline(
@@ -189,7 +204,7 @@ def fit_mlp_long_term(
     params = task_config.model_params
     splits = make_supervised_splits(prepared_df, feature_cols, task_config.target_col)
 
-    preprocessor = build_long_term_preprocessor(splits.X_train)
+    preprocessor = build_long_term_preprocessor(splits.X_train, scale_numeric=True)
     X_train = dense_float32(preprocessor.fit_transform(splits.X_train))
     X_validation = dense_float32(preprocessor.transform(splits.X_validation))
     X_test = dense_float32(preprocessor.transform(splits.X_test))
@@ -340,8 +355,8 @@ def train_long_term_model(
         )
         log_params_flat(mlflow, task_config.model_params, prefix="model")
 
-        if task_config.model_family == "random_forest":
-            model, metrics = fit_random_forest_long_term(prepared_df, selected_feature_cols, task_config)
+        if task_config.model_family in {"random_forest", "ridge", "logistic"}:
+            model, metrics = fit_sklearn_long_term(prepared_df, selected_feature_cols, task_config)
             model_path = artifact_dir / f"{model_stem}.joblib"
             joblib.dump(
                 {

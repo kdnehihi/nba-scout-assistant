@@ -45,4 +45,3 @@ def test_long_term_config_target_and_metric_contracts():
 def test_long_term_config_rejects_unknown_task():
     with pytest.raises(KeyError):
         resolve_long_term_task_config("unknown", 1)
-

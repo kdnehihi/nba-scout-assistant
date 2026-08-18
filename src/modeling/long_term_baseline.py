@@ -23,7 +23,7 @@ def normalize_categorical_missing_values(X: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(X).replace({None: np.nan})
 
 
-def build_long_term_preprocessor(X: pd.DataFrame) -> ColumnTransformer:
+def build_long_term_preprocessor(X: pd.DataFrame, scale_numeric: bool = False) -> ColumnTransformer:
     """Return a long-term tabular preprocessor for numeric and categorical features."""
     categorical_cols = [
         column
@@ -32,11 +32,15 @@ def build_long_term_preprocessor(X: pd.DataFrame) -> ColumnTransformer:
     ]
     numeric_cols = [column for column in X.columns if column not in categorical_cols]
 
+    numeric_steps = [("imputer", SimpleImputer(strategy="median"))]
+    if scale_numeric:
+        numeric_steps.append(("scaler", StandardScaler()))
+
     return ColumnTransformer(
         transformers=[
             (
                 "numeric",
-                Pipeline([("imputer", SimpleImputer(strategy="median"))]),
+                Pipeline(numeric_steps),
                 numeric_cols,
             ),
             (

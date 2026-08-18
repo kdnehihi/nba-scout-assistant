@@ -59,14 +59,14 @@ def feature_target_split(
     feature_cols: list[str],
     target_col: str,
 ) -> tuple[pd.DataFrame, pd.Series]:
-    """Return feature matrix X and target vector y after dropping incomplete rows."""
+    """Return feature matrix X and target vector y after dropping rows with missing target."""
     required_cols = [*feature_cols, target_col]
     missing_cols = sorted(set(required_cols) - set(df.columns))
 
     if missing_cols:
         raise KeyError(f"Missing feature/target columns: {missing_cols}")
 
-    clean = df.dropna(subset=required_cols).copy()
+    clean = df.dropna(subset=[target_col]).copy()
 
     return clean[feature_cols].copy(), clean[target_col].copy()
 

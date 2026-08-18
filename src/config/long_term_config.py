@@ -5,7 +5,7 @@ from typing import Any, Literal
 
 
 LongTermTaskType = Literal["classification", "regression"]
-LongTermModelFamily = Literal["random_forest", "mlp"]
+LongTermModelFamily = Literal["random_forest", "mlp", "ridge", "logistic"]
 
 LONG_TERM_TASKS = (
     "active_probability",
@@ -113,7 +113,7 @@ LONG_TERM_SELECTED_CONFIGS: dict[tuple[str, int], LongTermTaskConfig] = {
         model_family="mlp",
         model_params=_mlp_params((192, 96), 0.1649670079325266, 0.0006168967960669716, 0.00015832037046909113, 64, "bce", False),
         selection_metric="brier",
-        validation_value=0.1503136244105211,
+        validation_value=0.150166,
     ),
     ("pts_per_36", 1): LongTermTaskConfig(
         task="pts_per_36",
@@ -143,7 +143,7 @@ LONG_TERM_SELECTED_CONFIGS: dict[tuple[str, int], LongTermTaskConfig] = {
         model_family="mlp",
         model_params=_mlp_params((128, 64), 0.30893102776267806, 0.0008330803890301997, 1.414401002080816e-05, 256, "huber", True),
         selection_metric="mae",
-        validation_value=2.6230733394622803,
+        validation_value=2.686801,
     ),
     ("ast_per_36", 1): LongTermTaskConfig(
         task="ast_per_36",
@@ -173,7 +173,7 @@ LONG_TERM_SELECTED_CONFIGS: dict[tuple[str, int], LongTermTaskConfig] = {
         model_family="mlp",
         model_params=_mlp_params((192, 96), 0.23355586841671383, 0.000160712385120399, 1.037104137505588e-05, 256, "huber", False),
         selection_metric="mae",
-        validation_value=0.892236590385437,
+        validation_value=0.928842,
     ),
     ("reb_per_36", 1): LongTermTaskConfig(
         task="reb_per_36",
@@ -203,7 +203,7 @@ LONG_TERM_SELECTED_CONFIGS: dict[tuple[str, int], LongTermTaskConfig] = {
         model_family="mlp",
         model_params=_mlp_params((192, 96), 0.26918349112517104, 0.0003636817400938816, 0.00018198265284956783, 64, "huber", True),
         selection_metric="mae",
-        validation_value=1.0506700277328491,
+        validation_value=1.096094,
     ),
     ("pts_per_100", 1): LongTermTaskConfig(
         task="pts_per_100",
@@ -233,7 +233,7 @@ LONG_TERM_SELECTED_CONFIGS: dict[tuple[str, int], LongTermTaskConfig] = {
         model_family="mlp",
         model_params=_mlp_params((128, 64), 0.30893102776267806, 0.0008330803890301997, 1.414401002080816e-05, 256, "huber", True),
         selection_metric="mae",
-        validation_value=3.4342381954193115,
+        validation_value=3.524524,
     ),
     ("ast_per_100", 1): LongTermTaskConfig(
         task="ast_per_100",
@@ -263,7 +263,7 @@ LONG_TERM_SELECTED_CONFIGS: dict[tuple[str, int], LongTermTaskConfig] = {
         model_family="mlp",
         model_params=_mlp_params((192, 96), 0.23355586841671383, 0.000160712385120399, 1.037104137505588e-05, 256, "huber", False),
         selection_metric="mae",
-        validation_value=1.168047308921814,
+        validation_value=1.217234,
     ),
     ("reb_per_100", 1): LongTermTaskConfig(
         task="reb_per_100",
@@ -293,7 +293,7 @@ LONG_TERM_SELECTED_CONFIGS: dict[tuple[str, int], LongTermTaskConfig] = {
         model_family="mlp",
         model_params=_mlp_params((192, 96), 0.21280882494747455, 0.00016149614799999194, 0.0006156532440760017, 128, "huber", True),
         selection_metric="mae",
-        validation_value=1.394848346710205,
+        validation_value=1.502039,
     ),
 }
 
@@ -304,4 +304,3 @@ def resolve_long_term_task_config(task: str, horizon: int) -> LongTermTaskConfig
     if key not in LONG_TERM_SELECTED_CONFIGS:
         raise KeyError(f"Unknown long-term task config: task={task!r}, horizon={horizon!r}")
     return LONG_TERM_SELECTED_CONFIGS[key]
-

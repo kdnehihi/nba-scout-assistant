@@ -140,7 +140,7 @@ def load_long_term_model_artifact(
     artifact_root = Path(artifact_dir)
     model_stem = _long_term_model_stem(task_config)
 
-    if task_config.model_family == "random_forest":
+    if task_config.model_family in {"random_forest", "ridge", "logistic"}:
         artifact = joblib.load(_require_file(artifact_root / f"{model_stem}.joblib"))
         return LongTermModelArtifact(
             task=task_config.task,

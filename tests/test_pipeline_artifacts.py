@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from sklearn.preprocessing import StandardScaler
 
-from src.config.long_term_config import resolve_long_term_task_config
+from src.config.long_term_config import LongTermTaskConfig, resolve_long_term_task_config
 from src.config.lstm_config import LSTM_TASK_CONFIG
 from src.models.lstm import ShortTermLSTM
 from src.models.mlp import LongTermMLP
@@ -66,7 +66,21 @@ def test_load_long_term_random_forest_artifact_uses_saved_schema(tmp_path):
 
 
 def test_load_long_term_mlp_artifact_restores_model_and_preprocessor(tmp_path):
-    config = resolve_long_term_task_config("pts_per_36", 3)
+    config = LongTermTaskConfig(
+        task="pts_per_36",
+        horizon=3,
+        task_type="regression",
+        target_col="pts_per_36_h3",
+        model_family="mlp",
+        model_params={
+            "hidden_sizes": (16, 8),
+            "dropout": 0.1,
+            "batch_norm": False,
+            "batch_size": 32,
+        },
+        selection_metric="mae",
+        validation_value=0.0,
+    )
     model_stem = f"long_term_{config.task}_h{config.horizon}_{config.model_family}"
     input_size = 3
     params = config.model_params

@@ -4,12 +4,31 @@ import numpy as np
 import pandas as pd
 
 
+SEQUENCE_COLUMN_ALIASES = {
+    "pts": "points",
+    "ast": "assists",
+    "reb": "rebounds",
+    "min": "minutes",
+}
+
+
+def _with_sequence_aliases(df: pd.DataFrame) -> pd.DataFrame:
+    # Keep LSTM config names stable while accepting canonical gold-table names.
+    """Return a copy with short stat aliases added when only canonical columns exist."""
+    result = df.copy()
+    for alias, canonical in SEQUENCE_COLUMN_ALIASES.items():
+        if alias not in result.columns and canonical in result.columns:
+            result[alias] = result[canonical]
+    return result
+
+
 def make_lstm_delta_inference_window(
     df: pd.DataFrame,
     task_config,
 ) -> tuple[np.ndarray, np.ndarray, float, pd.Series]:
     # Build one latest LSTM input window without requiring future targets.
     """Return X_seq, X_static, baseline, and anchor row for one player history."""
+    df = _with_sequence_aliases(df)
     required_columns = [
         "player_id",
         "season",
@@ -58,7 +77,7 @@ def prepare_sequence_training(
     df: pd.DataFrame,
     task_config,
 ) -> pd.DataFrame:
-    sequence_df = df.copy()
+    sequence_df = _with_sequence_aliases(df)
 
     required_columns = [
         "player_id",

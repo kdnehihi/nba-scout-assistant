@@ -10,10 +10,7 @@ from src.pipelines.artifacts import (
     load_long_term_model_artifacts,
     load_short_term_model_artifacts,
 )
-from src.pipelines.forecasting import (
-    load_long_term_prediction_data,
-    load_short_term_prediction_data,
-)
+from src.pipelines.forecasting import load_long_term_prediction_data, load_short_term_prediction_data
 from src.pipelines.recommendation import (
     RecommendationPipelineData,
     load_recommendation_pipeline_data,

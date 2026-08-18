@@ -10,7 +10,12 @@ from scipy import sparse
 
 from src.config.long_term_config import LongTermTaskConfig
 from src.dataset.cleaning import normalize_name_key
-from src.dataset.loaders import load_long_term_inference, load_performance_training_clean, load_players, resolve_data_paths
+from src.dataset.loaders import (
+    load_long_term_inference,
+    load_performance_training_clean,
+    load_players,
+    resolve_data_paths,
+)
 from src.dataset.sequence import make_lstm_delta_inference_window
 from src.evaluation.evaluate_long_term import predict_mlp_long_term, predict_sklearn_long_term
 from src.pipelines.artifacts import LongTermModelArtifact, ShortTermModelArtifact
@@ -175,6 +180,12 @@ def _dense_float32(values: Any) -> np.ndarray:
     return np.asarray(values, dtype="float32")
 
 
+def _clip_probability(prediction: np.ndarray) -> np.ndarray:
+    # Keep served classification probabilities inside the valid probability range.
+    """Return probability predictions clipped to [0, 1]."""
+    return np.clip(prediction.astype("float64"), 0.0, 1.0)
+
+
 def predict_long_term_task(
     long_term_df: pd.DataFrame,
     artifact: LongTermModelArtifact,
@@ -198,7 +209,7 @@ def predict_long_term_task(
     X = anchor.to_frame().T[artifact.feature_cols]
     task_config: LongTermTaskConfig = artifact.task_config
 
-    if artifact.model_family == "random_forest":
+    if artifact.model_family in {"random_forest", "ridge", "logistic"}:
         prediction = predict_sklearn_long_term(artifact.model, X, task_config)
     elif artifact.model_family == "mlp":
         if artifact.preprocessor is None:
@@ -215,6 +226,9 @@ def predict_long_term_task(
             prediction = artifact.target_scaler.inverse_transform(prediction.reshape(-1, 1)).reshape(-1)
     else:
         raise ValueError(f"Unsupported long-term model family: {artifact.model_family}")
+
+    if task_config.task_type == "classification":
+        prediction = _clip_probability(prediction)
 
     return {
         "task": artifact.task,
@@ -251,6 +265,14 @@ def predict_long_term_tasks(
             artifact=artifact,
             **request,
         )
+    if "active_probability" in output:
+        previous_probability: float | None = None
+        for horizon in sorted(output["active_probability"]):
+            current = float(output["active_probability"][horizon]["prediction"])
+            if previous_probability is not None:
+                current = min(current, previous_probability)
+                output["active_probability"][horizon]["prediction"] = current
+            previous_probability = current
     return output
 
 

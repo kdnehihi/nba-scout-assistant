@@ -13,7 +13,23 @@ from src.dataset.sequence import make_lstm_delta_inference_window
 from src.modeling.long_term_baseline import build_long_term_preprocessor
 from src.models.lstm import ShortTermLSTM
 from src.pipelines.artifacts import LongTermModelArtifact, ShortTermModelArtifact
-from src.pipelines.forecasting import _filter_player_rows, predict_long_term_task, predict_long_term_tasks, predict_short_term_task, predict_short_term_tasks
+from src.pipelines.forecasting import (
+    _filter_player_rows,
+    predict_long_term_task,
+    predict_long_term_tasks,
+    predict_short_term_task,
+    predict_short_term_tasks,
+)
+
+
+class ConstantProbabilityModel:
+    def __init__(self, probability: float):
+        self.probability = probability
+
+    def predict_proba(self, X):
+        negative = np.full(len(X), 1.0 - self.probability)
+        positive = np.full(len(X), self.probability)
+        return np.column_stack([negative, positive])
 
 
 def make_short_term_artifact(task: str = "points") -> ShortTermModelArtifact:
@@ -70,6 +86,23 @@ def test_lstm_inference_window_reuses_training_sequence_shape():
         make_short_term_rows("points", n_rows=12),
         config,
     )
+
+    assert X_seq.shape == (1, config.sequence_length, 2)
+    assert X_static.shape == (1, 2)
+    assert baseline == 22.0
+    assert anchor["game_id"] == 11
+
+
+def test_lstm_inference_window_accepts_canonical_gold_stat_columns():
+    config = LSTM_TASK_CONFIG["points"]
+    rows = make_short_term_rows("points", n_rows=12).rename(
+        columns={
+            "pts": "points",
+            "min": "minutes",
+        }
+    )
+
+    X_seq, X_static, baseline, anchor = make_lstm_delta_inference_window(rows, config)
 
     assert X_seq.shape == (1, config.sequence_length, 2)
     assert X_static.shape == (1, 2)
@@ -157,3 +190,30 @@ def test_predict_long_term_tasks_filters_task_and_horizon():
     )
 
     assert predictions["pts_per_36"][1]["prediction"] == 18.0
+
+
+def test_predict_long_term_tasks_enforces_active_probability_monotonicity():
+    artifacts = {}
+    for horizon, probability in [(1, 0.8), (2, 0.7), (3, 0.95)]:
+        config = resolve_long_term_task_config("active_probability", horizon)
+        feature_cols = ["age", "minutes", "usage_pct"]
+        artifacts[("active_probability", horizon)] = LongTermModelArtifact(
+            task="active_probability",
+            horizon=horizon,
+            task_config=config,
+            model_family="random_forest",
+            model=ConstantProbabilityModel(probability),
+            feature_cols=feature_cols,
+        )
+
+    predictions = predict_long_term_tasks(
+        make_long_term_rows(),
+        artifacts,
+        tasks=["active_probability"],
+        horizons=[1, 2, 3],
+        player_id=1,
+    )
+
+    assert predictions["active_probability"][1]["prediction"] == 0.8
+    assert predictions["active_probability"][2]["prediction"] == 0.7
+    assert predictions["active_probability"][3]["prediction"] == 0.7
