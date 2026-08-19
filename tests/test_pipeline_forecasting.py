@@ -10,7 +10,7 @@ from sklearn.preprocessing import StandardScaler
 from src.config.long_term_config import resolve_long_term_task_config
 from src.config.lstm_config import LSTM_TASK_CONFIG
 from src.dataset.sequence import make_lstm_delta_inference_window
-from src.modeling.long_term_baseline import build_long_term_preprocessor
+from src.modeling.long_term_tabular import build_long_term_preprocessor
 from src.models.lstm import ShortTermLSTM
 from src.pipelines.artifacts import LongTermModelArtifact, ShortTermModelArtifact
 from src.pipelines.forecasting import (

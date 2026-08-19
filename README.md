@@ -11,7 +11,7 @@ compensation context.
 - Short-term performance forecasting: predict a player's next-five-game average
   points, assists, and rebounds.
 - Long-term player trajectory forecasting: estimate future availability and
-  per-minute/per-possession production across H1, H2, and H3 seasons.
+  per-36-minute production across H1, H2, and H3 seasons.
 - Player recommendation and similarity: compare players using role, production,
   physical profile, and scouting signals.
 - Player detail context: show current/historical salary and contract history for
@@ -59,6 +59,8 @@ data/gold/player_role_features_clean.parquet
 data/gold/performance_training_clean.parquet
 data/gold/player_salary_history_clean.parquet
 data/gold/long_term_player_forecast_training.parquet
+data/gold/long_term_player_forecast_inference.parquet
+data/gold/season_coverage.parquet
 ```
 
 Local data builders live under `src/dataset/`:
@@ -68,8 +70,9 @@ Local data builders live under `src/dataset/`:
 - `features_role.py`: player-season role features
 - `features_performance.py`: short-term rolling features and next-five targets
 - `features_compensation.py`: player salary history and salary-cap context
-- `features_long_term.py`: season-anchor long-term forecasting data
-- `long_term.py`: final long-term modeling data preparation and schema checks
+- `features_long_term.py`: season-anchor long-term feature engineering
+- `long_term_modeling.py`: final long-term modeling data preparation and schema checks
+- `season_coverage.py`: complete-season filtering for modeling data
 - `pipeline.py`: orchestration for rebuilding gold datasets
 
 ## Modeling
@@ -81,8 +84,9 @@ irregular, and better treated as panel sequence data across many players.
 
 Long-term forecasting uses selected model families from notebook experiments:
 
-- H1 and H2: Random Forest
-- H3: MLP
+- Availability H1/H2/H3: Random Forest
+- Per-36 production H1/H2: Random Forest
+- Per-36 production H3: MLP
 
 The selected long-term model family and hyperparameters are stored in:
 
@@ -101,6 +105,40 @@ src/evaluation/evaluate_long_term.py
 
 MLflow is used for experiment tracking with a SQLite backend and file artifact
 store.
+
+Per-100-possession production fields may appear in role profiles,
+recommendation inputs, and research artifacts. They are not exposed as selected
+long-term forecast targets in the API.
+
+## API Surface
+
+FastAPI entrypoint:
+
+```text
+app/main.py
+```
+
+The API is split into schemas and services:
+
+```text
+app/schemas/
+app/services/
+```
+
+Current endpoints:
+
+```text
+GET  /health
+GET  /metadata
+POST /recommendations
+POST /forecasts/short-term
+POST /forecasts/long-term
+POST /players/scouting-report
+```
+
+The scouting report endpoint composes player profile context, recommendation
+data, compensation history, deterministic scouting signals, and optional
+forecast outputs.
 
 ## Example Commands
 

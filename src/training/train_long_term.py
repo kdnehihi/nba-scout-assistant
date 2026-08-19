@@ -24,24 +24,24 @@ if str(ROOT) not in sys.path:
 
 from src.config.long_term_config import (
     LONG_TERM_HORIZONS,
-    LONG_TERM_TASKS,
+    LONG_TERM_FORECAST_TASKS,
     LongTermTaskConfig,
     resolve_long_term_task_config,
 )
 from src.dataset.loaders import DataPaths, load_long_term_training, resolve_data_paths
-from src.dataset.long_term import prepare_long_term_modeling_data
+from src.dataset.long_term_modeling import prepare_long_term_modeling_data
 from src.evaluation.evaluate_long_term import (
     evaluate_long_term_split_predictions,
     predict_mlp_long_term,
     predict_sklearn_long_term,
 )
-from src.modeling.long_term_baseline import (
+from src.modeling.long_term_tabular import (
     build_long_term_logistic_baseline,
     build_long_term_preprocessor,
     build_long_term_ridge_baseline,
 )
 from src.models.mlp import LongTermMLP
-from src.models.randomforest import build_random_forest_classifier, build_random_forest_regressor
+from src.models.random_forest import build_random_forest_classifier, build_random_forest_regressor
 from src.training.mlflow_utils import configure_mlflow, log_metrics_flat, log_params_flat
 from src.training.splitters import make_supervised_splits
 
@@ -431,7 +431,7 @@ def train_long_term_models(
 ) -> pd.DataFrame:
     """Train every selected long-term task/horizon model and return all metrics."""
     all_metrics = []
-    for task in LONG_TERM_TASKS:
+    for task in LONG_TERM_FORECAST_TASKS:
         for horizon in LONG_TERM_HORIZONS:
             metrics = train_long_term_model(
                 task=task,
@@ -449,7 +449,7 @@ def train_long_term_models(
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments for long-term model training."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--task", choices=[*LONG_TERM_TASKS, "all"], default="all")
+    parser.add_argument("--task", choices=[*LONG_TERM_FORECAST_TASKS, "all"], default="all")
     parser.add_argument("--horizon", type=int, choices=[*LONG_TERM_HORIZONS], default=None)
     parser.add_argument("--data-dir", default="data")
     parser.add_argument("--artifact-dir", default=str(DEFAULT_ARTIFACT_DIR))
@@ -464,7 +464,7 @@ def main() -> None:
     args = parse_args()
     if args.task == "all":
         if args.horizon is not None:
-            for task in LONG_TERM_TASKS:
+            for task in LONG_TERM_FORECAST_TASKS:
                 train_long_term_model(
                     task=task,
                     horizon=args.horizon,

@@ -33,7 +33,7 @@ def build_all_gold_datasets(paths: DataPaths) -> dict[str, object]:
     game_logs = filter_to_modeling_seasons(game_logs, modeling_seasons)
     season_stats = filter_to_modeling_seasons(season_stats, modeling_seasons)
 
-    role_features = build_role_features(players, season_stats)
+    role_features = build_role_features(players, season_stats, game_logs=game_logs)
     performance_training = build_performance_training(game_logs)
     salary_history = build_player_salary_history(salaries, salary_cap, players)
     long_term_training = build_long_term_training(game_logs, players, season_stats)

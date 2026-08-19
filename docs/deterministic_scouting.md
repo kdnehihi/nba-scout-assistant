@@ -373,7 +373,8 @@ The function:
 1. Builds one player-season role table with salary context.
 2. Filters candidates by season, position group, salary, age, and minutes when
    requested.
-3. Standardizes role features.
+3. Standardizes role features. `points_per_100`, `assists_per_100`, and
+   `rebounds_per_100` are treated as per-100-possession production fields.
 4. Computes Euclidean distance to the target player.
 5. Converts distance into:
 

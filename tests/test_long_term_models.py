@@ -4,7 +4,7 @@ import torch
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
 from models.mlp import LongTermMLP
-from models.randomforest import build_random_forest_classifier, build_random_forest_regressor
+from models.random_forest import build_random_forest_classifier, build_random_forest_regressor
 
 
 def test_long_term_mlp_returns_one_value_per_row():

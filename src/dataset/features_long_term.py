@@ -266,7 +266,7 @@ def add_future_horizon_targets(
     horizons: list[int] = LONG_TERM_HORIZONS,
 ) -> pd.DataFrame:
     # Attach observed future-season labels for each forecast horizon.
-    """Add h1/h2/h3 active, games, per-minute, per-possession, and per-game targets."""
+    """Add h1/h2/h3 active, per-36, per-100-possession, and per-game labels."""
     result = anchor_features.copy()
     future_lookup = season_summary.set_index(["player_id", "season_start_year"])
     max_observed_season_start = int(season_summary["season_start_year"].max())

@@ -14,9 +14,6 @@ LongTermTask = Literal[
     "pts_per_36",
     "ast_per_36",
     "reb_per_36",
-    "pts_per_100",
-    "ast_per_100",
-    "reb_per_100",
 ]
 
 

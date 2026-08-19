@@ -12,6 +12,7 @@ The project uses layered data processing:
 raw / bronze / silver inputs
 -> loaders
 -> shared cleaning helpers
+-> complete-season filtering
 -> split assignment
 -> task-specific feature builders
 -> gold modeling datasets
@@ -31,6 +32,8 @@ build_role_features()
 build_performance_training()
 build_player_salary_history()
 build_long_term_training()
+build_long_term_inference()
+summarize_game_log_season_coverage()
         |
         v
 data/gold/*.parquet
@@ -43,6 +46,8 @@ data/gold/player_role_features_clean.parquet
 data/gold/performance_training_clean.parquet
 data/gold/player_salary_history_clean.parquet
 data/gold/long_term_player_forecast_training.parquet
+data/gold/long_term_player_forecast_inference.parquet
+data/gold/season_coverage.parquet
 ```
 
 The data pipeline intentionally keeps split labels inside the output
@@ -119,17 +124,21 @@ Kaggle nba-traditional
   -> data/silver/player_game_logs.parquet
   -> performance_training_clean.parquet
   -> long_term_player_forecast_training.parquet
+  -> long_term_player_forecast_inference.parquet
+  -> season_coverage.parquet
 
 Player bio/profile CSV
   -> data/raw/players.parquet
   -> player_role_features_clean.parquet
   -> player_salary_history_clean.parquet
   -> long_term_player_forecast_training.parquet
+  -> long_term_player_forecast_inference.parquet
 
 Advanced / usage / defense season stats + recent-season patches
   -> data/raw/player_season_stats.parquet
   -> player_role_features_clean.parquet
   -> long_term_player_forecast_training.parquet
+  -> long_term_player_forecast_inference.parquet
 
 Historical salaries + salary cap table
   -> data/silver/player_season_salaries.parquet
@@ -193,6 +202,7 @@ Dataset-specific loaders:
 - `load_player_salary_history_clean(paths)`
 - `load_contract_history(paths, required=False)`
 - `load_long_term_training(paths)`
+- `load_long_term_inference(paths)`
 
 ### Notable Details
 
@@ -357,6 +367,39 @@ validation_df = df[df["split"].eq("validation")]
 test_df = df[df["split"].eq("test")]
 ```
 
+## `src/dataset/season_coverage.py`
+
+### Main Responsibility
+
+`season_coverage.py` identifies which game-log seasons are complete enough for
+modeling and filters out later sparse seasons before feature generation.
+
+### Important Functions
+
+`summarize_game_log_season_coverage(game_logs)`
+
+- Returns one row per season with row count, unique games, player count, team
+  count, date range, and `is_modeling_complete`.
+
+`latest_complete_modeling_season(game_logs)`
+
+- Returns the latest season whose coverage passes the configured minimum unique
+  games and teams checks.
+
+`modeling_seasons_through_latest_complete(game_logs)`
+
+- Returns all seasons up to the latest complete modeling season.
+
+`filter_to_modeling_seasons(df, seasons, season_col="season")`
+
+- Filters any season-based dataframe to the approved modeling seasons.
+
+### Notable Details
+
+- This prevents partially available recent seasons from entering training data.
+- The coverage summary is saved as `data/gold/season_coverage.parquet` for
+  auditing.
+
 ## `src/dataset/features_role.py`
 
 ### Main Responsibility
@@ -370,8 +413,8 @@ modeling, recommendations, and scouting signals.
 `ROLE_NUMERIC_FEATURES`
 
 - Numeric columns expected in role feature construction.
-- Includes bio, workload, usage, production, shooting, defense proxies, pace,
-  possessions, and ratings.
+- Includes bio, workload, usage, per-100-possession production, shooting,
+  defense proxies, pace, possessions, and ratings.
 
 ### Important Functions
 
@@ -400,8 +443,12 @@ offensive_rating - defensive_rating
 This is subtraction, not addition, because higher offensive rating is better
 while lower defensive rating is better.
 
-`build_role_features(players, season_stats)`
+`build_role_features(players, season_stats, game_logs=None)`
 
+- Uses `game_logs` when available to compute `points_per_100`,
+  `assists_per_100`, and `rebounds_per_100` as per-100-possession rates.
+- Falls back to `season_stats` production columns when game logs are not
+  supplied.
 - Converts percentage columns to ratio scale.
 - Merges player bio data onto season stats by `player_id`.
 - Resolves duplicated columns such as `position` and `position_player`.
@@ -425,6 +472,8 @@ Including `team_id` matters because a player may change teams within a season.
 
 - The composite role-dimension weights are heuristic. A future revision should
   consider season-standardized z-score inputs before weighted sums.
+- `points_per_100`, `assists_per_100`, and `rebounds_per_100` mean
+  per-100-possession production, not per-100-minute production.
 - Role features are a core join table for other tasks, so schema stability is
   important.
 
@@ -576,6 +625,7 @@ history features, and attaches future horizon targets.
   - total points, assists, rebounds
   - availability rate
   - points/assists/rebounds per 36 minutes
+  - points/assists/rebounds per 100 estimated possessions
 - Merges selected advanced season stats when available.
 - Merges player metadata.
 - Computes `age_at_anchor`.
@@ -584,7 +634,12 @@ history features, and attaches future horizon targets.
   - `career_minutes`
   - `years_in_league`
 
-`add_lag_features(summary)`
+`build_recent_game_anchor_features(game_logs)`
+
+- Summarizes each player's most recent games within an anchor season.
+- Creates recent workload, efficiency, rest, and trend features.
+
+`add_lagged_season_features(summary)`
 
 - Adds lagged trajectory features for each player.
 - `lag_0` is the current anchor season value.
@@ -601,23 +656,42 @@ minutes_per_game_lag_2
 availability_rate_lag_3
 ```
 
-`add_future_targets(summary)`
+`add_future_horizon_targets(anchor_features, season_summary)`
 
 - Adds H1/H2/H3 future targets by shifting each player's future seasons
   backward onto the current anchor row.
-- Current targets include:
+- The gold table retains several future labels for evaluation and research:
   - `games_played_h1/h2/h3`
   - `pts_per_36_h1/h2/h3`
   - `ast_per_36_h1/h2/h3`
   - `reb_per_36_h1/h2/h3`
+  - `pts_per_100_h1/h2/h3`
+  - `ast_per_100_h1/h2/h3`
+  - `reb_per_100_h1/h2/h3`
+  - `pts_per_game_h1/h2/h3`
+  - `ast_per_game_h1/h2/h3`
+  - `reb_per_game_h1/h2/h3`
   - `active_h1/h2/h3`
   - `low_availability_h1/h2/h3`
   - `high_availability_h1/h2/h3`
 
+The selected product forecast tasks are narrower:
+
+```text
+active_probability
+pts_per_36
+ast_per_36
+reb_per_36
+```
+
+Per-100 fields here mean per-100-possession rates. They are retained for
+research and feature context, not as selected API forecast targets.
+
 `build_long_term_training(game_logs, players, season_stats)`
 
 - Builds player-season summaries.
-- Adds lag features.
+- Adds recent game anchor features.
+- Adds lagged season features.
 - Adds future targets.
 - Drops rows without required active horizon labels.
 - Creates anchor metadata:
@@ -626,6 +700,12 @@ availability_rate_lag_3
   - `anchor_date`
 - Assigns long-term split labels.
 - Filters out `ignore` rows.
+
+`build_long_term_inference(game_logs, players, season_stats)`
+
+- Builds the same anchor-time feature rows without requiring future labels.
+- Supports API inference for recent complete seasons that are not part of the
+  training split.
 
 ### Output Grain
 
@@ -644,8 +724,52 @@ future availability and production in t+1, t+2, and t+3.
   future labels are complete.
 - Per-36 rates normalize production for playing time but should be interpreted
   together with minutes and availability features.
+- Per-100 rates normalize production by estimated possessions and are kept as
+  context/research columns.
 - Availability and minutes remain difficult targets because they are heavily
   affected by injuries, team role, coaching, trades, and career exits.
+
+## `src/dataset/long_term_modeling.py`
+
+### Main Responsibility
+
+`long_term_modeling.py` prepares the gold long-term dataframe for model
+training. It does not create raw features; it validates schema, removes leaking
+future-target columns from the feature list, and returns task-specific modeling
+rows.
+
+### Important Functions
+
+`is_long_term_model_feature(column)`
+
+- Returns `False` for metadata and future-horizon target columns.
+- Prevents labels such as `pts_per_36_h1`, `active_h2`, or
+  `pts_per_100_h3` from being used as anchor-time input features.
+
+`infer_long_term_feature_columns(df)`
+
+- Infers the allowed feature columns from a gold long-term dataframe.
+
+`validate_long_term_columns(df, task_config, feature_cols)`
+
+- Checks that required metadata, selected features, and the requested target
+  column exist.
+
+`validate_long_term_split(df)`
+
+- Confirms split labels are valid and match the configured temporal split map.
+
+`prepare_long_term_modeling_data(df, task_config, feature_cols=None)`
+
+- Returns the filtered modeling dataframe and selected feature list for one
+  long-term task/horizon.
+
+### Notable Details
+
+- Actual `train`, `validation`, and `test` slicing happens later in the training
+  layer.
+- Per-100-possession future labels may exist in the gold table, but this file
+  still excludes them from model features to avoid leakage.
 
 ## `src/dataset/pipeline.py`
 
@@ -663,6 +787,8 @@ gold layer should be rebuilt from canonical source inputs.
 - Builds short-term performance training data.
 - Builds clean salary history for player detail context.
 - Builds long-term forecasting data.
+- Builds long-term inference data.
+- Saves season coverage for data completeness audit.
 - Saves all outputs to `paths.gold_dir`.
 - Returns a dictionary of output dataframes.
 
@@ -673,13 +799,16 @@ player_role_features_clean.parquet
 performance_training_clean.parquet
 player_salary_history_clean.parquet
 long_term_player_forecast_training.parquet
+long_term_player_forecast_inference.parquet
+season_coverage.parquet
 ```
 
 ### Notable Details
 
 - The pipeline currently writes full parquet outputs every time it runs.
-- It does not yet include DVC commands, MLflow logging, data validation reports,
-  or incremental cache checks.
+- It does not run DVC commands, MLflow logging, or incremental cache checks.
+- Season coverage is saved as a data audit artifact, but detailed validation
+  reports should remain in the data-evaluation layer.
 - It should remain thin: detailed transformation logic belongs in the feature
   builder modules.
 
@@ -694,8 +823,10 @@ For code review or onboarding, read the files in this order:
 4. src/dataset/features_role.py
 5. src/dataset/features_performance.py
 6. src/dataset/features_compensation.py
-7. src/dataset/features_long_term.py
-8. src/dataset/pipeline.py
+7. src/dataset/season_coverage.py
+8. src/dataset/features_long_term.py
+9. src/dataset/long_term_modeling.py
+10. src/dataset/pipeline.py
 ```
 
 This order moves from data access, to shared transformations, to split policy,
@@ -723,8 +854,9 @@ mind when promoting experimental logic into local source code.
 Keep the existing modeling decisions:
 
 - Keep per-36 production features for long-term production modeling.
-- Keep per-100 possession experiments as comparison artifacts, but do not replace
-  per-36 unless evaluation clearly improves.
+- Keep per-100-possession fields as comparison artifacts or profile context, but
+  do not expose them as production forecast targets unless evaluation clearly
+  improves and the API contract is updated.
 - Keep short-term next-five-game forecasting targets for PTS, AST, and REB.
 - Keep salary and contract history as reference context, not as a forecasting
   target.

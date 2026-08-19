@@ -93,6 +93,14 @@ def test_build_role_features_creates_role_dimensions():
     assert role["position"].iloc[0] == "G"
 
 
+def test_build_role_features_uses_game_log_possession_per_100_when_available():
+    role = build_role_features(sample_players(), sample_season_stats(), game_logs=sample_game_logs())
+    row = role[role["season"].eq("2022-23")].iloc[0]
+
+    assert round(row["points_per_100"], 2) == 24.00
+    assert row["points_per_100"] != 32
+
+
 def test_build_performance_training_creates_next_five_targets():
     performance = build_performance_training(sample_game_logs())
 

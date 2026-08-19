@@ -7,15 +7,13 @@ from typing import Any, Literal
 LongTermTaskType = Literal["classification", "regression"]
 LongTermModelFamily = Literal["random_forest", "mlp", "ridge", "logistic"]
 
-LONG_TERM_TASKS = (
+LONG_TERM_FORECAST_TASKS = (
     "active_probability",
     "pts_per_36",
     "ast_per_36",
     "reb_per_36",
-    "pts_per_100",
-    "ast_per_100",
-    "reb_per_100",
 )
+LONG_TERM_TASKS = LONG_TERM_FORECAST_TASKS
 LONG_TERM_HORIZONS = (1, 2, 3)
 
 
@@ -110,10 +108,10 @@ LONG_TERM_SELECTED_CONFIGS: dict[tuple[str, int], LongTermTaskConfig] = {
         horizon=3,
         task_type="classification",
         target_col="active_h3",
-        model_family="mlp",
-        model_params=_mlp_params((192, 96), 0.1649670079325266, 0.0006168967960669716, 0.00015832037046909113, 64, "bce", False),
+        model_family="random_forest",
+        model_params=_rf_classifier_params(300, 4, "sqrt"),
         selection_metric="brier",
-        validation_value=0.150166,
+        validation_value=0.156623,
     ),
     ("pts_per_36", 1): LongTermTaskConfig(
         task="pts_per_36",
@@ -204,96 +202,6 @@ LONG_TERM_SELECTED_CONFIGS: dict[tuple[str, int], LongTermTaskConfig] = {
         model_params=_mlp_params((192, 96), 0.26918349112517104, 0.0003636817400938816, 0.00018198265284956783, 64, "huber", True),
         selection_metric="mae",
         validation_value=1.096094,
-    ),
-    ("pts_per_100", 1): LongTermTaskConfig(
-        task="pts_per_100",
-        horizon=1,
-        task_type="regression",
-        target_col="pts_per_100_h1",
-        model_family="random_forest",
-        model_params=_rf_regressor_params(300, 4, "sqrt"),
-        selection_metric="mae",
-        validation_value=3.1206774901010346,
-    ),
-    ("pts_per_100", 2): LongTermTaskConfig(
-        task="pts_per_100",
-        horizon=2,
-        task_type="regression",
-        target_col="pts_per_100_h2",
-        model_family="random_forest",
-        model_params=_rf_regressor_params(300, 8, 0.85),
-        selection_metric="mae",
-        validation_value=3.359991549193136,
-    ),
-    ("pts_per_100", 3): LongTermTaskConfig(
-        task="pts_per_100",
-        horizon=3,
-        task_type="regression",
-        target_col="pts_per_100_h3",
-        model_family="mlp",
-        model_params=_mlp_params((128, 64), 0.30893102776267806, 0.0008330803890301997, 1.414401002080816e-05, 256, "huber", True),
-        selection_metric="mae",
-        validation_value=3.524524,
-    ),
-    ("ast_per_100", 1): LongTermTaskConfig(
-        task="ast_per_100",
-        horizon=1,
-        task_type="regression",
-        target_col="ast_per_100_h1",
-        model_family="random_forest",
-        model_params=_rf_regressor_params(500, 12, 0.45),
-        selection_metric="mae",
-        validation_value=1.057053616475143,
-    ),
-    ("ast_per_100", 2): LongTermTaskConfig(
-        task="ast_per_100",
-        horizon=2,
-        task_type="regression",
-        target_col="ast_per_100_h2",
-        model_family="random_forest",
-        model_params=_rf_regressor_params(300, 4, "sqrt"),
-        selection_metric="mae",
-        validation_value=1.0334815285317311,
-    ),
-    ("ast_per_100", 3): LongTermTaskConfig(
-        task="ast_per_100",
-        horizon=3,
-        task_type="regression",
-        target_col="ast_per_100_h3",
-        model_family="mlp",
-        model_params=_mlp_params((192, 96), 0.23355586841671383, 0.000160712385120399, 1.037104137505588e-05, 256, "huber", False),
-        selection_metric="mae",
-        validation_value=1.217234,
-    ),
-    ("reb_per_100", 1): LongTermTaskConfig(
-        task="reb_per_100",
-        horizon=1,
-        task_type="regression",
-        target_col="reb_per_100_h1",
-        model_family="random_forest",
-        model_params=_rf_regressor_params(300, 4, "sqrt"),
-        selection_metric="mae",
-        validation_value=1.1439175789495484,
-    ),
-    ("reb_per_100", 2): LongTermTaskConfig(
-        task="reb_per_100",
-        horizon=2,
-        task_type="regression",
-        target_col="reb_per_100_h2",
-        model_family="random_forest",
-        model_params=_rf_regressor_params(300, 4, "sqrt"),
-        selection_metric="mae",
-        validation_value=1.4098317863958942,
-    ),
-    ("reb_per_100", 3): LongTermTaskConfig(
-        task="reb_per_100",
-        horizon=3,
-        task_type="regression",
-        target_col="reb_per_100_h3",
-        model_family="mlp",
-        model_params=_mlp_params((192, 96), 0.21280882494747455, 0.00016149614799999194, 0.0006156532440760017, 128, "huber", True),
-        selection_metric="mae",
-        validation_value=1.502039,
     ),
 }
 

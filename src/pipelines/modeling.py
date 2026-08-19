@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.config.long_term_config import LONG_TERM_HORIZONS, LONG_TERM_TASKS
+from src.config.long_term_config import LONG_TERM_HORIZONS, LONG_TERM_FORECAST_TASKS
 from src.training.train_long_term import train_long_term_model, train_long_term_models
 from src.training.train_short_term import train_short_term
 
@@ -51,7 +51,7 @@ def run_long_term_training_pipeline(
                 data_dir=data_dir,
                 artifact_dir=artifact_dir,
             )
-            for task_name in LONG_TERM_TASKS
+            for task_name in LONG_TERM_FORECAST_TASKS
         ]
         return pd.concat(metrics, ignore_index=True)
 

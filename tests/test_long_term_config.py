@@ -5,7 +5,7 @@ import pytest
 from config.long_term_config import (
     LONG_TERM_HORIZONS,
     LONG_TERM_SELECTED_CONFIGS,
-    LONG_TERM_TASKS,
+    LONG_TERM_FORECAST_TASKS,
     resolve_long_term_task_config,
 )
 
@@ -13,18 +13,21 @@ from config.long_term_config import (
 def test_long_term_config_covers_all_tasks_and_horizons():
     expected_keys = {
         (task, horizon)
-        for task in LONG_TERM_TASKS
+        for task in LONG_TERM_FORECAST_TASKS
         for horizon in LONG_TERM_HORIZONS
     }
 
     assert set(LONG_TERM_SELECTED_CONFIGS) == expected_keys
 
 
-def test_long_term_config_uses_random_forest_for_h1_h2_and_mlp_for_h3():
-    for task in LONG_TERM_TASKS:
+def test_long_term_config_uses_random_forest_for_active_and_mlp_for_h3_regression():
+    for task in LONG_TERM_FORECAST_TASKS:
         assert resolve_long_term_task_config(task, 1).model_family == "random_forest"
         assert resolve_long_term_task_config(task, 2).model_family == "random_forest"
-        assert resolve_long_term_task_config(task, 3).model_family == "mlp"
+        if task == "active_probability":
+            assert resolve_long_term_task_config(task, 3).model_family == "random_forest"
+        else:
+            assert resolve_long_term_task_config(task, 3).model_family == "mlp"
 
 
 def test_long_term_config_target_and_metric_contracts():
@@ -34,7 +37,7 @@ def test_long_term_config_target_and_metric_contracts():
     assert active.task_type == "classification"
     assert active.target_col == "active_h3"
     assert active.selection_metric == "brier"
-    assert active.model_params["loss_name"] == "bce"
+    assert "n_estimators" in active.model_params
 
     assert scoring.task_type == "regression"
     assert scoring.target_col == "pts_per_36_h2"

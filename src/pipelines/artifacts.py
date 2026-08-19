@@ -7,7 +7,7 @@ from typing import Any
 import joblib
 import torch
 
-from src.config.long_term_config import LONG_TERM_HORIZONS, LONG_TERM_TASKS, LongTermTaskConfig
+from src.config.long_term_config import LONG_TERM_HORIZONS, LONG_TERM_FORECAST_TASKS, LongTermTaskConfig
 from src.config.lstm_config import LSTM_TASK_CONFIG, LSTMTaskConfig
 from src.models.lstm import ShortTermLSTM
 from src.models.mlp import LongTermMLP
@@ -184,7 +184,7 @@ def load_long_term_model_artifacts(
 
         task_configs = tuple(
             resolve_long_term_task_config(task, horizon)
-            for task in LONG_TERM_TASKS
+            for task in LONG_TERM_FORECAST_TASKS
             for horizon in LONG_TERM_HORIZONS
         )
 

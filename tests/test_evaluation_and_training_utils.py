@@ -4,7 +4,7 @@ import pandas as pd
 
 from evaluation.metrics import range_metrics, regression_metrics
 from evaluation.evaluate_short_term import evaluate_lstm_predictions_by_split
-from modeling.long_term_baseline import (
+from modeling.long_term_tabular import (
     attach_long_term_preprocessor,
     build_long_term_logistic_baseline,
     build_long_term_preprocessor,

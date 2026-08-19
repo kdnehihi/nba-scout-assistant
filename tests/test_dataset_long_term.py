@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from config.long_term_config import resolve_long_term_task_config
-from dataset.long_term import infer_long_term_feature_columns, prepare_long_term_training, validate_long_term_split
+from dataset.long_term_modeling import infer_long_term_feature_columns, prepare_long_term_training, validate_long_term_split
 
 
 def sample_long_term_frame() -> pd.DataFrame:
