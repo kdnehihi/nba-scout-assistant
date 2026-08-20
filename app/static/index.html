@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NBA Scout Assistant</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>NBA Scout Assistant</h1>
+        <p>Find comparable players, then inspect forecasts, role signals, and compensation context.</p>
+      </div>
+      <div class="status" id="serviceStatus">Checking service</div>
+    </header>
+
+    <main class="layout">
+      <section class="panel search-panel" aria-labelledby="searchTitle">
+        <h2 id="searchTitle">Search</h2>
+        <form id="recommendationForm" class="form">
+          <label>
+            Player name
+            <input id="playerName" name="playerName" type="text" value="LeBron James" autocomplete="off" required />
+          </label>
+
+          <div class="field-row">
+            <label>
+              Season
+              <input id="season" name="season" type="text" value="2024-25" placeholder="2024-25" />
+            </label>
+            <label>
+              Top K
+              <input id="topN" name="topN" type="number" value="5" min="1" max="25" />
+            </label>
+          </div>
+
+          <label>
+            Profile preset
+            <select id="preset" name="preset">
+              <option value="playing_profile">Playing profile</option>
+              <option value="role_similarity">Role similarity</option>
+              <option value="scoring_profile">Scoring profile</option>
+              <option value="defensive_profile">Defensive profile</option>
+            </select>
+          </label>
+
+          <div class="toggles">
+            <label>
+              <input id="sameSeason" type="checkbox" checked />
+              Same season
+            </label>
+            <label>
+              <input id="samePositionGroup" type="checkbox" checked />
+              Same position group
+            </label>
+          </div>
+
+          <label>
+            Minimum minutes
+            <input id="minutesMin" name="minutesMin" type="number" value="500" min="0" step="50" />
+          </label>
+
+          <button type="submit" class="primary-button">Find Similar Players</button>
+        </form>
+
+        <div class="message" id="message"></div>
+      </section>
+
+      <section class="panel candidates-panel" aria-labelledby="candidatesTitle">
+        <div class="section-heading">
+          <h2 id="candidatesTitle">Candidates</h2>
+          <span id="candidateCount">0</span>
+        </div>
+        <div class="candidate-list" id="candidateList"></div>
+      </section>
+
+      <section class="panel report-panel" aria-labelledby="reportTitle">
+        <div class="section-heading">
+          <h2 id="reportTitle">Player Report</h2>
+          <span id="selectedPlayer">No player selected</span>
+        </div>
+
+        <div class="report-grid">
+          <section class="report-section">
+            <h3>Profile</h3>
+            <div class="metric-grid" id="profileMetrics"></div>
+          </section>
+
+          <section class="report-section">
+            <h3>Short-Term Forecast</h3>
+            <div class="metric-grid" id="shortTermMetrics"></div>
+          </section>
+
+          <section class="report-section">
+            <h3>Long-Term Forecast</h3>
+            <div class="forecast-table" id="longTermMetrics"></div>
+          </section>
+
+          <section class="report-section">
+            <h3>Compensation</h3>
+            <div id="compensationBlock" class="stack"></div>
+          </section>
+
+          <section class="report-section wide">
+            <h3>Recent Performance</h3>
+            <div class="compact-table" id="recentPerformance"></div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>

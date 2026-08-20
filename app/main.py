@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
 
 from app.schemas.forecasting import PredictLongTermRequest, PredictShortTermRequest
 from app.schemas.recommendation import RecommendationRequest
@@ -15,6 +18,7 @@ from app.services.resources import AppResources, load_app_resources
 
 
 app = FastAPI(title="NBA Scout Assistant")
+STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 
 def get_resources() -> AppResources:
@@ -67,3 +71,7 @@ def scouting_report(request: ScoutingReportRequest):
         return build_scouting_report_response(get_resources(), request)
     except (KeyError, ValueError) as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+if STATIC_DIR.exists():
+    app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
