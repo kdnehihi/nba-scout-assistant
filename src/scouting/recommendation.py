@@ -43,11 +43,33 @@ STAT_FEATURE_GROUPS: dict[str, list[str]] = {
     ],
 }
 
+FOCUSED_PROFILE_FEATURES: dict[str, list[str]] = {
+    "scoring_profile": [
+        "points_per_100",
+        "usage_pct",
+        "true_shooting_pct",
+        "three_point_attempt_rate",
+        "free_throw_rate",
+    ],
+    "defensive_profile": [
+        "steal_rate",
+        "block_rate",
+        "defensive_rebound_rate",
+        "foul_rate",
+    ],
+}
+
 PHYSICAL_FEATURES = ["height", "weight"]
 ALL_RECOMMENDER_FEATURES = sorted(
     {feature for features in STAT_FEATURE_GROUPS.values() for feature in features}
     | set(PHYSICAL_FEATURES)
 )
+FORM_FEATURES = [
+    "pts_last_5_minus_season_avg",
+    "ast_last_5_minus_season_avg",
+    "reb_last_5_minus_season_avg",
+    "min_last_5_minus_season_avg",
+]
 
 RANKING_PRESETS: dict[str, dict[str, float]] = {
     "role_similarity": {
@@ -59,6 +81,12 @@ RANKING_PRESETS: dict[str, dict[str, float]] = {
         "role_similarity_score": 0.85,
         "workload_reliability_score": 0.10,
         "physical_match_score": 0.05,
+    },
+    "scoring_profile": {
+        "scoring_profile_score": 1.00,
+    },
+    "defensive_profile": {
+        "defensive_profile_score": 1.00,
     },
     "workload_fit": {
         "role_similarity_score": 0.75,
@@ -131,6 +159,41 @@ def physical_context_by_player_season(physical_df: pd.DataFrame) -> pd.DataFrame
     return physical.drop_duplicates(["player_id", "season_start_year"])
 
 
+def collapse_player_season_stints(base_df: pd.DataFrame) -> pd.DataFrame:
+    """Combine multi-team season rows into one minutes-weighted player profile."""
+    if not base_df.duplicated(["player_id", "season"]).any():
+        return base_df.reset_index(drop=True)
+
+    weighted_columns = [
+        column
+        for column in [*ALL_RECOMMENDER_FEATURES, *FORM_FEATURES]
+        if column != "minutes" and column in base_df.columns
+    ]
+    collapsed_rows = []
+    for _, stints in base_df.groupby(["player_id", "season"], sort=False, dropna=False):
+        stints = stints.copy()
+        stint_minutes = pd.to_numeric(stints["minutes"], errors="coerce").clip(lower=0)
+        representative = stints.loc[stint_minutes.fillna(-1).idxmax()].copy()
+
+        if len(stints) > 1:
+            for column in weighted_columns:
+                values = pd.to_numeric(stints[column], errors="coerce")
+                valid = values.notna() & stint_minutes.notna()
+                valid_weight = stint_minutes[valid]
+                if valid.any() and valid_weight.sum() > 0:
+                    representative[column] = np.average(values[valid], weights=valid_weight)
+                elif values.notna().any():
+                    representative[column] = values.mean()
+
+            representative["minutes"] = stint_minutes.sum(min_count=1)
+            if "team_id" in stints.columns and stints["team_id"].dropna().nunique() > 1:
+                representative["team_id"] = "MULTI"
+
+        collapsed_rows.append(representative)
+
+    return pd.DataFrame(collapsed_rows, columns=base_df.columns).reset_index(drop=True)
+
+
 def build_recommendation_base(
     role_df: pd.DataFrame,
     physical_df: pd.DataFrame | None = None,
@@ -166,7 +229,7 @@ def build_recommendation_base(
         if column in base.columns:
             base[column] = pd.to_numeric(base[column], errors="coerce")
 
-    return base
+    return collapse_player_season_stints(base)
 
 
 def robust_minmax_score(values: pd.Series, higher_is_better: bool = True) -> pd.Series:
@@ -256,6 +319,11 @@ def add_similarity_scores(target: pd.Series, candidates: pd.DataFrame) -> pd.Dat
         result[distance_col] = distances.iloc[1:].to_numpy(dtype="float64")
         result[score_col] = 1 / (1 + result[distance_col])
         group_distance_cols.append(distance_col)
+
+    for profile_name, features in FOCUSED_PROFILE_FEATURES.items():
+        distances = standardized_group_distance(scoring_df, target_index=0, features=features)
+        result[f"{profile_name}_distance"] = distances.iloc[1:].to_numpy(dtype="float64")
+        result[f"{profile_name}_score"] = 1 / (1 + result[f"{profile_name}_distance"])
 
     result["role_similarity_distance"] = result[group_distance_cols].mean(axis=1)
     result["role_similarity_score"] = 1 / (1 + result["role_similarity_distance"])
@@ -359,6 +427,13 @@ def recommend_players(
         "minutes",
         "recommendation_score",
         "role_similarity_score",
+        "workload_score",
+        "scoring_score",
+        "playmaking_score",
+        "rebounding_score",
+        "defense_score",
+        "scoring_profile_score",
+        "defensive_profile_score",
         "workload_reliability_score",
         "physical_match_score",
         "height_gap",

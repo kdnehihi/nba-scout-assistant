@@ -405,6 +405,28 @@ not as:
 equivalent player quality
 ```
 
+### Ranking Profiles
+
+The focused ranking presets use a single standardized feature group, so their
+scores do not depend on manually invented cross-group weights:
+
+- `scoring_profile` compares points per 100 possessions, usage percentage,
+  true shooting percentage, three-point attempt rate, and free-throw rate.
+- `defensive_profile` compares steal rate, block rate, defensive rebound rate,
+  and foul rate.
+
+Each feature is standardized within the target and filtered candidate pool.
+The group distance is the root mean squared standardized feature difference,
+and the displayed score is `1 / (1 + distance)`. Derived role dimensions are
+excluded from these focused profiles because they duplicate their source
+statistics and would implicitly overweight them. Position, season, and minimum
+minutes remain candidate filters rather than hidden ranking weights.
+
+When a player has multiple team stints in one season, the recommender first
+creates one player-season profile by minutes-weighting the rate statistics and
+summing minutes. This prevents traded players from occupying multiple places
+in the top-K result while retaining information from every stint.
+
 ## Recommendation Ground Truth Proxy
 
 ### Purpose

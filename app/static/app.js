@@ -88,7 +88,11 @@ function renderCandidates(candidates) {
     const playerId = candidate.player_id ?? candidate.candidate_player_id ?? "";
     const playerName = candidate.player_name ?? candidate.candidate_player_name ?? "Unknown player";
     const season = candidate.season ?? candidate.candidate_season ?? "";
-    const score = candidate.similarity_score ?? candidate.score;
+    const score =
+      candidate.recommendation_score ??
+      candidate.role_similarity_score ??
+      candidate.similarity_score ??
+      candidate.score;
     const key = `${playerId}-${playerName}-${season}`;
     const button = document.createElement("button");
     button.type = "button";

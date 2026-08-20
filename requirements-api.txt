@@ -1,0 +1,14 @@
+# API framework
+fastapi>=0.116,<1.0
+uvicorn[standard]>=0.35,<1.0
+pydantic>=2.11,<3.0
+
+# Inference data stack
+numpy>=2.2,<3.0
+pandas>=2.2,<3.0
+scipy>=1.14,<2.0
+pyarrow>=18.0,<22.0
+
+# Persisted model compatibility
+scikit-learn==1.6.1
+joblib>=1.4,<2.0

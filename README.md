@@ -140,6 +140,32 @@ The scouting report endpoint composes player profile context, recommendation
 data, compensation history, deterministic scouting signals, and optional
 forecast outputs.
 
+## Docker API
+
+The API image installs only inference dependencies from `requirements-api.txt`.
+Training, notebook, DVC, Kaggle, and MLflow dependencies remain in the full
+development environment and are not included in the runtime image.
+
+Build the image:
+
+```bash
+docker build -f docker/Dockerfile -t nba-scout-assistant-api .
+```
+
+Run it with the local data and model artifacts mounted read-only:
+
+```bash
+docker run --rm --name nba-scout-api \
+  -p 8001:8001 \
+  -v "$PWD/data:/app/data:ro" \
+  -v "$PWD/artifacts:/app/artifacts:ro" \
+  nba-scout-assistant-api
+```
+
+Open `http://localhost:8001` for the demo or
+`http://localhost:8001/docs` for the API documentation. The container health
+check calls `GET /health` after application startup.
+
 ## Example Commands
 
 Run tests:

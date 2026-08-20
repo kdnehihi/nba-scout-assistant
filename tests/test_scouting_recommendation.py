@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
 from evaluation.evaluate_similarity import (
     build_future_similarity_ground_truth,
@@ -66,6 +67,54 @@ def test_recommend_players_returns_grouped_explanations():
     assert recommendations["player_name"].iloc[0] == "Similar Guard"
     assert "matched groups" in recommendations["recommendation_reason"].iloc[0]
     assert recommendations["position_group"].eq("guard").all()
+
+
+def test_scoring_profile_ranks_by_observed_scoring_similarity():
+    base = build_recommendation_base(sample_role_features())
+
+    recommendations = recommend_players(
+        base,
+        player_name="Target Guard",
+        season="2024-25",
+        top_n=2,
+        preset="scoring_profile",
+        minutes_min=500,
+    )
+
+    assert recommendations["player_name"].iloc[0] == "Similar Guard"
+    assert recommendations["recommendation_score"].equals(recommendations["scoring_profile_score"])
+
+
+def test_defensive_profile_ranks_by_observed_defensive_similarity():
+    base = build_recommendation_base(sample_role_features())
+
+    recommendations = recommend_players(
+        base,
+        player_name="Target Guard",
+        season="2024-25",
+        top_n=2,
+        preset="defensive_profile",
+        minutes_min=500,
+    )
+
+    assert recommendations["player_name"].iloc[0] == "Similar Guard"
+    assert recommendations["recommendation_score"].equals(recommendations["defensive_profile_score"])
+
+
+def test_recommendation_base_collapses_multi_team_seasons():
+    role_features = sample_role_features()
+    second_stint = role_features.loc[[1]].copy()
+    second_stint["team_id"] = "EEE"
+    second_stint["minutes"] = 400
+    second_stint["points_per_100"] = 27.0
+
+    base = build_recommendation_base(pd.concat([role_features, second_stint], ignore_index=True))
+    similar_guard = base[base["player_id"].eq(2)].iloc[0]
+
+    assert base["player_id"].eq(2).sum() == 1
+    assert similar_guard["team_id"] == "MULTI"
+    assert similar_guard["minutes"] == 2500
+    assert similar_guard["points_per_100"] == pytest.approx((30.5 * 2100 + 27.0 * 400) / 2500)
 
 
 def test_select_target_row_uses_normalized_player_name():

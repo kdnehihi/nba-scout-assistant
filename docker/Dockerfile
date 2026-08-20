@@ -1,13 +1,26 @@
 FROM python:3.12-slim
 
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
 WORKDIR /app
 
-COPY requirements.txt .
+COPY requirements-api.txt .
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --index-url https://download.pytorch.org/whl/cpu "torch>=2.3,<3.0" \
+    && pip install -r requirements-api.txt \
+    && addgroup --system app \
+    && adduser --system --ingroup app app
 
-COPY app ./app
-COPY src ./src
+COPY --chown=app:app app ./app
+COPY --chown=app:app src ./src
+
+USER app
 
 EXPOSE 8001
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=3)"]
+
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
