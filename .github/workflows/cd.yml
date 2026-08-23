@@ -21,7 +21,7 @@ env:
   ECS_CLUSTER: nba-scout-assistant-cluster
   ECS_SERVICE: nba-scout-assistant-service
   ECS_TASK_DEFINITION: nba-scout-assistant
-  ECS_CONTAINER_NAME: Main
+  ECS_CONTAINER_NAME: nba-scout-api
   DOCKER_IMAGE: khoatran1/nba-scout-assistant
 
 jobs:

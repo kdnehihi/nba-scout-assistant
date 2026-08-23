@@ -177,8 +177,8 @@ then run the workflow manually and provide the Docker Hub tag to deploy.
 
 The image must already exist at `khoatran1/nba-scout-assistant:<tag>`. The
 workflow creates a new revision from the current `nba-scout-assistant` task
-definition, updates the `Main` container image, deploys it, and waits for the
-service to become stable.
+definition, updates the `nba-scout-api` container image, deploys it, and waits
+for the service to become stable.
 
 ## Example Commands
 
