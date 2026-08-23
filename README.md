@@ -172,8 +172,11 @@ check calls `GET /health` after application startup.
 The `CD` GitHub Actions workflow deploys an existing Docker Hub image tag to
 the `nba-scout-assistant-service` service in the
 `nba-scout-assistant-cluster` ECS cluster. Add `AWS_ACCESS_KEY_ID` and
-`AWS_SECRET_ACCESS_KEY` to the repository's `production` environment secrets,
-then run the workflow manually and provide the Docker Hub tag to deploy.
+`AWS_SECRET_ACCESS_KEY` to the repository's `production` environment secrets.
+
+After CI succeeds for `main`, CD automatically deploys the Docker Hub `latest`
+tag. The manual workflow remains available for deploying a specific immutable
+tag or rerunning a deployment.
 
 The image must already exist at `khoatran1/nba-scout-assistant:<tag>`. The
 workflow creates a new revision from the current `nba-scout-assistant` task
