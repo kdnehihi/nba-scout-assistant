@@ -169,19 +169,24 @@ check calls `GET /health` after application startup.
 
 ### ECS deployment
 
-The `CD` GitHub Actions workflow deploys an existing Docker Hub image tag to
-the `nba-scout-assistant-service` service in the
-`nba-scout-assistant-cluster` ECS cluster. Add `AWS_ACCESS_KEY_ID` and
-`AWS_SECRET_ACCESS_KEY` to the repository's `production` environment secrets.
+The `CD` GitHub Actions workflow builds and pushes the API image to Docker Hub,
+then deploys it to the `nba-scout-assistant-service` service in the
+`nba-scout-assistant-cluster` ECS cluster. Add `AWS_ACCESS_KEY_ID`,
+`AWS_SECRET_ACCESS_KEY`, and `DOCKERHUB_TOKEN` to the repository's `production`
+environment secrets. Use a Docker Hub personal access token rather than the
+account password.
 
-After CI succeeds for `main`, CD automatically deploys the Docker Hub `latest`
-tag. The manual workflow remains available for deploying a specific immutable
-tag or rerunning a deployment.
+After CI succeeds for `main`, CD builds the current commit for `linux/amd64`,
+pushes both an immutable commit-SHA tag and `latest`, and deploys the SHA tag to
+ECS. The manual workflow remains available for rebuilding and redeploying the
+current `main` commit.
 
-The image must already exist at `khoatran1/nba-scout-assistant:<tag>`. The
-workflow creates a new revision from the current `nba-scout-assistant` task
-definition, updates the `nba-scout-api` container image, deploys it, and waits
-for the service to become stable.
+Because serving data and model artifacts are not committed to Git, the CD
+Dockerfile copies `/app/data` and `/app/artifacts` from the immutable
+`khoatran1/nba-scout-assistant:0.2.0` runtime snapshot. Application code and
+dependencies are always rebuilt from the commit that passed CI. When selected
+models or serving data change, publish a new runtime snapshot and update
+`RUNTIME_SNAPSHOT_IMAGE` in `docker/Dockerfile.cd`.
 
 ## Example Commands
 
