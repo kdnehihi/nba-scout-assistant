@@ -1,0 +1,70 @@
+name: CD
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Docker Hub image tag to deploy
+        required: true
+        default: latest
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-ecs
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-2
+  ECS_CLUSTER: nba-scout-assistant-cluster
+  ECS_SERVICE: nba-scout-assistant-service
+  ECS_TASK_DEFINITION: nba-scout-assistant
+  ECS_CONTAINER_NAME: Main
+  DOCKER_IMAGE: khoatran1/nba-scout-assistant
+
+jobs:
+  deploy:
+    name: Deploy Docker image to ECS
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify Docker image exists
+        run: docker manifest inspect "${DOCKER_IMAGE}:${{ inputs.image_tag }}" >/dev/null
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Download current task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "$ECS_TASK_DEFINITION" \
+            --query taskDefinition \
+            > task-definition.json
+
+      - name: Render task definition with selected image
+        id: render-task-definition
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ env.ECS_CONTAINER_NAME }}
+          image: ${{ env.DOCKER_IMAGE }}:${{ inputs.image_tag }}
+
+      - name: Deploy task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-task-definition.outputs.task-definition }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          service: ${{ env.ECS_SERVICE }}
+          wait-for-service-stability: true
+          wait-max-delay-seconds: 15

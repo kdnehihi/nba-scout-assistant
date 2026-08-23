@@ -142,9 +142,12 @@ forecast outputs.
 
 ## Docker API
 
-The API image installs only inference dependencies from `requirements-api.txt`.
-Training, notebook, DVC, Kaggle, and MLflow dependencies remain in the full
-development environment and are not included in the runtime image.
+The API image installs only inference dependencies from `requirements-api.txt`
+and includes the current immutable serving snapshot: four gold datasets, three
+short-term LSTM checkpoints, and the selected long-term model artifacts.
+Training, notebook, DVC, Kaggle, MLflow, and unused research outputs are not
+included. Rebuild and republish the image whenever the serving data or selected
+model artifacts change.
 
 Build the image:
 
@@ -152,19 +155,30 @@ Build the image:
 docker build -f docker/Dockerfile -t nba-scout-assistant-api .
 ```
 
-Run it with the local data and model artifacts mounted read-only:
+Run the self-contained image:
 
 ```bash
 docker run --rm --name nba-scout-api \
   -p 8001:8001 \
-  -v "$PWD/data:/app/data:ro" \
-  -v "$PWD/artifacts:/app/artifacts:ro" \
   nba-scout-assistant-api
 ```
 
 Open `http://localhost:8001` for the demo or
 `http://localhost:8001/docs` for the API documentation. The container health
 check calls `GET /health` after application startup.
+
+### ECS deployment
+
+The `CD` GitHub Actions workflow deploys an existing Docker Hub image tag to
+the `nba-scout-assistant-service` service in the
+`nba-scout-assistant-cluster` ECS cluster. Add `AWS_ACCESS_KEY_ID` and
+`AWS_SECRET_ACCESS_KEY` to the repository's `production` environment secrets,
+then run the workflow manually and provide the Docker Hub tag to deploy.
+
+The image must already exist at `khoatran1/nba-scout-assistant:<tag>`. The
+workflow creates a new revision from the current `nba-scout-assistant` task
+definition, updates the `Main` container image, deploys it, and waits for the
+service to become stable.
 
 ## Example Commands
 
