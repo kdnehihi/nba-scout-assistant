@@ -79,7 +79,7 @@ pipeline source focuses on the core clean modeling tables.
 
 ## Source Data Inventory
 
-The exploratory notebook `notebooks/01_data_processing.ipynb` uses several
+The ingestion notebook `notebooks/00_data_ingestion.ipynb` uses several
 external and curated sources because no single public dataset contains all
 fields required for player performance, role similarity, long-term forecasting,
 recommendations, and compensation context.
@@ -861,8 +861,8 @@ Keep the existing modeling decisions:
 - Keep salary and contract history as reference context, not as a forecasting
   target.
 
-Promote these `04_scouting_signals.ipynb` artifacts later if the local app needs
-scout-facing signals with low model risk:
+Notebook `notebooks/06_scouting_signals.ipynb` evaluates these scout-facing
+signals with low model risk:
 
 - `player_trend_signals`: recent-vs-season trend labels for production and
   minutes.

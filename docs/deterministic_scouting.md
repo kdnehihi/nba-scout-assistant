@@ -58,7 +58,7 @@ clear downstream metric for the relevant decision.
 The reviewed calibration output came from:
 
 ```text
-notebooks/04_scouting_signals.ipynb
+notebooks/06_scouting_signals.ipynb
 ```
 
 The notebook reads the same clean gold data used by local modules:
