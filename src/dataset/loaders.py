@@ -167,6 +167,15 @@ def load_performance_training_clean(paths: DataPaths) -> pd.DataFrame:
     return load_tabular_data(paths.gold_dir / "performance_training_clean.parquet")
 
 
+def load_short_term_inference(paths: DataPaths) -> pd.DataFrame:
+    # Prefer current label-free inference rows and fall back to historical training rows.
+    """Load short-term prediction rows through the latest available game."""
+    latest_path = paths.gold_dir / "short_term_inference_latest.parquet"
+    if latest_path.exists():
+        return load_tabular_data(latest_path)
+    return load_performance_training_clean(paths)
+
+
 def load_player_salary_history_clean(paths: DataPaths) -> pd.DataFrame:
     # Read the materialized player salary history table from the gold layer.
     """Load clean player salary history from the gold layer."""
@@ -191,11 +200,14 @@ def load_long_term_training(paths: DataPaths) -> pd.DataFrame:
 def load_long_term_inference(paths: DataPaths, build_if_missing: bool = True) -> pd.DataFrame:
     # Read or build long-term prediction anchors that do not require future target labels.
     """Load long-term player forecast inference data from the gold layer."""
-    path = paths.gold_dir / "long_term_player_forecast_inference.parquet"
-    if path.exists():
-        return load_tabular_data(path)
+    latest_path = paths.gold_dir / "long_term_player_forecast_inference_latest.parquet"
+    legacy_path = paths.gold_dir / "long_term_player_forecast_inference.parquet"
+    if latest_path.exists():
+        return load_tabular_data(latest_path)
+    if legacy_path.exists():
+        return load_tabular_data(legacy_path)
     if not build_if_missing:
-        return load_tabular_data(path)
+        return load_tabular_data(latest_path)
 
     from .features_long_term import build_long_term_inference
 
@@ -205,5 +217,5 @@ def load_long_term_inference(paths: DataPaths, build_if_missing: bool = True) ->
         season_stats=load_player_season_stats(paths),
     )
     paths.gold_dir.mkdir(parents=True, exist_ok=True)
-    inference.to_parquet(path, index=False)
+    inference.to_parquet(latest_path, index=False)
     return inference

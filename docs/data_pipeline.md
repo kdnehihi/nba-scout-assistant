@@ -18,6 +18,17 @@ raw / bronze / silver inputs
 -> gold modeling datasets
 ```
 
+Current online updates use a separate inference path so incomplete current
+seasons never alter historical train/validation/test datasets:
+
+```text
+BALLDONTLIE /stats
+-> immutable Bronze JSON snapshot + ingestion checkpoint
+-> canonical normalization and player-ID review
+-> cross-source upsert into Silver player_game_logs
+-> label-free short-term and long-term Gold inference datasets
+```
+
 The local source-code flow is orchestrated by `src/dataset/pipeline.py`:
 
 ```text
@@ -48,6 +59,8 @@ data/gold/player_salary_history_clean.parquet
 data/gold/long_term_player_forecast_training.parquet
 data/gold/long_term_player_forecast_inference.parquet
 data/gold/season_coverage.parquet
+data/gold/short_term_inference_latest.parquet
+data/gold/long_term_player_forecast_inference_latest.parquet
 ```
 
 The data pipeline intentionally keeps split labels inside the output
@@ -97,6 +110,7 @@ The current source inventory is:
 | Salary cap and tax level | Curated NBA salary-cap history, backed by official NBA cap releases where available | `data/raw/salary_cap/salary_cap_by_season.csv` | `season`, `salary_cap_usd`, `tax_level_usd` | `salary_cap_share` for cross-era salary context |
 | Optional contract history | Manually staged contract-event reference data | `data/raw/contract_value/contract_events.csv` | player name, contract start/end, average salary, pre-contract box-score context | Contract history display only |
 | NBA API fallback | `nba_api` / `stats.nba.com` endpoints | `data/raw/nba_api_cache/`, `data/raw/player_game_logs_nba_api.parquet` | fallback player metadata, game logs, season stats | Fallback only; not the primary historical source because live requests can timeout/throttle |
+| Incremental player game logs | BALLDONTLIE Game Player Stats API | `data/bronze/balldontlie/` -> `data/silver/player_game_logs.parquet` | current regular-season box scores, game/team context, source IDs and fetch audit fields | Nightly short-term and long-term inference refresh |
 
 ### Source Selection Notes
 
@@ -114,6 +128,52 @@ The current source inventory is:
 - The canonical local training pipeline expects staged canonical files. It does
   not download from Kaggle or call `nba_api` directly; source acquisition is
   handled by notebooks or manual data refresh steps before local training.
+
+## Incremental Online Update
+
+`src/dataset/balldontlie.py` owns HTTP access and source normalization.
+`src/dataset/incremental.py` owns persistence and layer transitions. The
+application wrapper is `run_online_data_update_pipeline()` in
+`src/pipelines/data.py`.
+
+Run one update from the repository root:
+
+```bash
+python -m scripts.update_online_data --data-dir data
+```
+
+The command reads `BALLDONTLIE_API_KEY` from the environment or local `.env`.
+It performs these steps in order:
+
+1. Read `data/silver/player_game_logs.parquet` as canonical historical state.
+2. Use `data/bronze/balldontlie/ingestion_state.json` as the API watermark
+   after the first successful run. On the first run, use the latest Silver
+   game date instead.
+3. Refetch two prior dates by default so delayed source corrections can be
+   incorporated without downloading the full history.
+4. Save the unmodified API rows under partitioned gzip JSON files in
+   `data/bronze/balldontlie/player_game_stats/`.
+5. Normalize source fields to the canonical game-log schema. BALLDONTLIE IDs
+   remain in `source_*` audit columns and are never silently substituted for
+   canonical NBA player IDs.
+6. Store players that cannot be mapped in
+   `data/bronze/balldontlie/unmatched_players_latest.parquet`. These rows are
+   excluded from Silver until a reviewed mapping or explicit override exists.
+7. Upsert mapped rows using `player_id + game_date + team_id`. This key is used
+   instead of `game_id` because game identifiers can differ across sources.
+   Existing canonical game IDs are retained for overlapping rows while updated
+   box-score values replace stale values.
+8. Atomically replace `data/silver/player_game_logs.parquet` and recompute
+   player rest days over the full timeline.
+9. Rebuild `short_term_inference_latest.parquet` without requiring next-five
+   labels and rebuild `long_term_player_forecast_inference_latest.parquet`
+   without future-season labels.
+10. Write the checkpoint only after Bronze, Silver, and Gold operations finish
+    successfully. A failed job therefore retries the same date range safely.
+
+The historical Gold training tables are deliberately not rebuilt by this
+command. Their temporal split policy remains stable until a reviewed retraining
+cycle explicitly promotes newer complete seasons.
 
 ## Source-To-Gold Lineage
 

@@ -4,6 +4,8 @@ import pandas as pd
 import pytest
 
 from dataset.loaders import (
+    load_long_term_inference,
+    load_short_term_inference,
     load_tabular_data,
     require_columns,
     resolve_data_paths,
@@ -41,3 +43,19 @@ def test_require_columns_reports_missing_columns():
 
     with pytest.raises(KeyError, match="missing required columns"):
         require_columns(df, ["a", "b"], "sample")
+
+
+def test_inference_loaders_prefer_latest_gold_outputs(tmp_path):
+    paths = resolve_data_paths(tmp_path)
+    paths.gold_dir.mkdir(parents=True)
+    pd.DataFrame({"marker": ["short_latest"]}).to_parquet(
+        paths.gold_dir / "short_term_inference_latest.parquet",
+        index=False,
+    )
+    pd.DataFrame({"marker": ["long_latest"]}).to_parquet(
+        paths.gold_dir / "long_term_player_forecast_inference_latest.parquet",
+        index=False,
+    )
+
+    assert load_short_term_inference(paths)["marker"].iloc[0] == "short_latest"
+    assert load_long_term_inference(paths)["marker"].iloc[0] == "long_latest"

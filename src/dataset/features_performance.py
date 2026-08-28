@@ -94,3 +94,24 @@ def build_performance_training(game_logs: pd.DataFrame) -> pd.DataFrame:
     features = features.dropna(subset=existing_required).copy()
     features = features[features["split"].isin(["train", "validation", "test"])].copy()
     return features.reset_index(drop=True)
+
+
+def build_performance_inference(
+    game_logs: pd.DataFrame,
+    min_history: int = 5,
+) -> pd.DataFrame:
+    # Keep point-in-time rolling features without requiring future target labels.
+    """Build short-term inference rows through the latest available game."""
+    features = add_rolling_player_features(game_logs, min_history=min_history)
+    required = [
+        "pts_season_avg",
+        "ast_season_avg",
+        "reb_season_avg",
+        "min_season_avg",
+    ]
+    features = features.dropna(subset=required).copy()
+    target_columns = [
+        column for column in features.columns if column.startswith("target_next_")
+    ]
+    features = features.drop(columns=target_columns)
+    return features.reset_index(drop=True)

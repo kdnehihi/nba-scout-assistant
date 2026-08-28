@@ -34,9 +34,9 @@ AWS ECS Fargate deployment.
 | Player report | Complete | Profile, recent performance, forecasts, salary history, and optional contract context |
 | API and frontend | Complete | FastAPI endpoints and a responsive static dashboard served by the same container |
 | Experiment tracking | Complete | MLflow parameters, metrics, artifacts, and reusable checkpoints |
-| Testing and delivery | Complete | 69 automated tests, GitHub Actions CI, Docker Hub publishing, and ECS deployment |
+| Testing and delivery | Complete | 78 automated tests, GitHub Actions CI, Docker Hub publishing, and ECS deployment |
 | Cloud runtime | Live demo | Single-container AWS ECS Fargate service in `us-east-2` |
-| Automated data refresh | Not implemented | Serving data is an immutable snapshot through the 2024-25 season |
+| Automated data refresh | Pipeline ready | BALLDONTLIE incremental Bronze/Silver/Gold inference refresh with checkpointing; cloud scheduling remains pending |
 
 The deployed serving snapshot currently contains:
 

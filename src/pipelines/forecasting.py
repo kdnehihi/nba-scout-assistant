@@ -12,8 +12,8 @@ from src.config.long_term_config import LongTermTaskConfig
 from src.dataset.cleaning import normalize_name_key
 from src.dataset.loaders import (
     load_long_term_inference,
-    load_performance_training_clean,
     load_players,
+    load_short_term_inference,
     resolve_data_paths,
 )
 from src.dataset.sequence import make_lstm_delta_inference_window
@@ -146,7 +146,7 @@ def load_short_term_prediction_data(data_dir: Path | str = "data") -> pd.DataFra
     # Load clean short-term gold data for inference window selection.
     """Load short-term prediction source data from the gold layer."""
     paths = resolve_data_paths(data_dir)
-    performance = load_performance_training_clean(paths)
+    performance = load_short_term_inference(paths)
     if "player_name" not in performance.columns and "player_id" in performance.columns:
         players = load_players(paths)
         player_lookup = players[["player_id", "player_name"]].drop_duplicates("player_id")

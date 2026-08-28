@@ -4,7 +4,7 @@ import pandas as pd
 
 from dataset.features_compensation import build_player_salary_history
 from dataset.features_long_term import build_long_term_inference, build_long_term_training
-from dataset.features_performance import build_performance_training
+from dataset.features_performance import build_performance_inference, build_performance_training
 from dataset.features_role import build_role_features
 
 
@@ -107,6 +107,14 @@ def test_build_performance_training_creates_next_five_targets():
     assert {"target_next_5_pts_avg", "pts_last_5", "split"}.issubset(performance.columns)
     assert set(performance["split"]).issubset({"train", "validation", "test"})
     assert performance["target_next_5_pts_avg"].notna().all()
+
+
+def test_build_performance_inference_keeps_latest_rows_without_future_targets():
+    inference = build_performance_inference(sample_game_logs())
+
+    latest_game = sample_game_logs()["game_id"].max()
+    assert inference["game_id"].max() == latest_game
+    assert not any(column.startswith("target_next_") for column in inference.columns)
 
 
 def test_build_player_salary_history_merges_cap_and_player_ids():
