@@ -353,30 +353,34 @@ Replacement ranking answers:
 Which players have similar statistical role profiles in the same season?
 ```
 
-The local implementation is:
+The serving and preprocessing implementation is:
 
 ```text
-src/scouting/similarity.py
+src/scouting/recommendation.py
+src/scouting/ranking.py
+src/dataset/recommendation_modeling.py
 ```
 
-The main functions are:
+The principal functions are:
 
 ```python
-build_similarity_base(role_features, salary)
-find_replacement_candidates(...)
+build_recommendation_base(...)
+recommend_players(...)
+SeasonFeaturePreprocessor.fit(...)
+SeasonFeaturePreprocessor.transform(...)
 ```
 
 ### Calculation
 
 The function:
 
-1. Builds one player-season role table with salary context.
-2. Filters candidates by season, position group, salary, age, and minutes when
-   requested.
-3. Standardizes role features. `points_per_100`, `assists_per_100`, and
-   `rebounds_per_100` are treated as per-100-possession production fields.
-4. Computes Euclidean distance to the target player.
-5. Converts distance into:
+1. Builds one player-season role table and minutes-weights multi-team stints.
+2. Shrinks noisy rate statistics toward minutes-weighted full-season priors.
+3. Standardizes every field against the complete season player pool.
+4. Filters candidates by season, position group, and minutes when requested.
+5. Applies the selected ranker or a deterministic preset-specific distance.
+
+Deterministic scores convert distance into:
 
 ```text
 similarity_score = 1 / (1 + similarity_distance)
@@ -384,16 +388,12 @@ similarity_score = 1 / (1 + similarity_distance)
 
 ### Calibration Status
 
-Similarity uses equal-weight standardized features. This is deterministic and
-auditable, but it is not supervised-calibrated.
+Focused similarity uses equal-weight, season-normalized feature differences.
+The default `playing_profile` is calibrated by XGBoost LambdaMART against a
+graded next-season proxy and promoted only after locked temporal evaluation.
 
-Calibrating similarity weights requires one of:
-
-- human-labeled similar-player pairs
-- downstream retrieval success labels
-- a business objective such as cheaper replacement hit rate
-
-Until one of those exists, similarity should be described as:
+Until expert labels or observed downstream roster outcomes exist, every preset
+should still be described as:
 
 ```text
 statistical role similarity
@@ -407,7 +407,7 @@ equivalent player quality
 
 ### Ranking Profiles
 
-The focused ranking presets use a single standardized feature group, so their
+The focused ranking presets use direct non-overlapping feature groups, so their
 scores do not depend on manually invented cross-group weights:
 
 - `scoring_profile` compares points per 100 possessions, usage percentage,
@@ -415,12 +415,12 @@ scores do not depend on manually invented cross-group weights:
 - `defensive_profile` compares steal rate, block rate, defensive rebound rate,
   and foul rate.
 
-Each feature is standardized within the target and filtered candidate pool.
-The group distance is the root mean squared standardized feature difference,
-and the displayed score is `1 / (1 + distance)`. Derived role dimensions are
-excluded from these focused profiles because they duplicate their source
-statistics and would implicitly overweight them. Position, season, and minimum
-minutes remain candidate filters rather than hidden ranking weights.
+Each feature is standardized against its complete season pool before request
+filters are applied. The group distance is the root mean squared standardized
+feature difference, and the displayed score is `1 / (1 + distance)`. Derived
+role dimensions are excluded because they duplicate source statistics and
+would implicitly overweight them. Position, season, and minimum minutes remain
+candidate filters rather than hidden ranking weights.
 
 When a player has multiple team stints in one season, the recommender first
 creates one player-season profile by minutes-weighting the rate statistics and
@@ -442,17 +442,19 @@ If the recommendation is made at season t, did it retrieve players whose
 season t+1 profile became similar to the target player's season t+1 profile?
 ```
 
-The local implementation is:
+The proxy and ranker evaluation implementation is:
 
 ```text
-src/evaluation/evaluate_similarity.py
+src/dataset/recommendation_modeling.py
+src/evaluation/evaluate_recommendation_ranking.py
 ```
 
 The main functions are:
 
 ```python
-build_future_similarity_ground_truth(...)
-evaluate_recommendations_against_ground_truth(...)
+build_temporal_ranking_dataset(...)
+evaluate_ranking_queries(...)
+paired_query_bootstrap(...)
 ```
 
 ### Label Construction
@@ -461,9 +463,11 @@ For every target player-season:
 
 1. Find the same player's next-season row.
 2. Find candidate players from the same anchor season.
-3. Compare target and candidate next-season profiles using standardized role
-   and physical features.
-4. Mark the closest `relevant_n` candidates as proxy-relevant.
+3. Compare target and candidate next-season profiles using the fixed observed
+   feature contract.
+4. Give the closest five candidates graded relevance `5, 4, 3, 2, 1`.
+5. Give remaining candidates, including unavailable next-season players,
+   relevance zero.
 
 This creates labels such as:
 
@@ -471,23 +475,31 @@ This creates labels such as:
 target_player_id
 target_season
 candidate_player_id
-future_relevance_rank
-future_similarity_score
+query_id
+relevance
+abs_diff__<observed_feature>
 ```
 
 ### Metrics
 
 The recommendation output is evaluated with:
 
-- `hit_rate`: share of returned top-K recommendations that are proxy-relevant.
-- `recall_at_k`: share of proxy-relevant players recovered in the top-K list.
+- `ndcg_at_5`: graded ranking quality with greater credit for highly relevant
+  candidates near the top.
+- `hit_rate_at_5`: share of queries with at least one relevant recommendation.
+- `recall_at_5`: share of proxy-relevant players recovered in the top five.
 - `mrr`: reciprocal rank of the first proxy-relevant recommendation.
+- `coverage_at_5`: share of the candidate universe surfaced across queries.
+- paired query-bootstrap confidence intervals for improvement over the champion.
+- p50 and p95 scoring latency.
 
 ### Limitations
 
 This is not a scout-labeled ground truth. It is a future-outcome proxy. It is
-useful for sanity checks and model comparison, but final recommendation quality
-should still be reviewed qualitatively on known player cases.
+useful for model selection and regression tests, but final recommendation
+quality should still be reviewed qualitatively on known player cases. Full
+feature, split, tuning, and promotion details are documented in
+[recommendation_ranking.md](recommendation_ranking.md).
 
 ## Compensation Context
 

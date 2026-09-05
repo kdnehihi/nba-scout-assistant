@@ -2,102 +2,63 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import StandardScaler
 
+from src.config.recommendation_config import (
+    DEFAULT_SHRINKAGE_PRIOR_STRENGTH,
+    PRESET_FEATURES,
+    RECOMMENDATION_FEATURE_GROUPS,
+    RECOMMENDATION_FEATURES,
+)
 from src.dataset.cleaning import normalize_name_key
-
+from src.scouting.ranking import (
+    RecommendationRankerArtifact,
+    SeasonFeaturePreprocessor,
+    normalized_feature_name,
+)
 
 STAT_FEATURE_GROUPS: dict[str, list[str]] = {
-    "workload": [
-        "minutes",
-        "usage_pct",
-    ],
-    "scoring": [
-        "points_per_100",
-        "usage_pct",
-        "true_shooting_pct",
-        "three_point_attempt_rate",
-        "free_throw_rate",
-        "scoring_creation",
-        "shooting",
-        "rim_pressure",
-    ],
-    "playmaking": [
-        "assists_per_100",
-        "turnover_rate",
-        "playmaking",
-    ],
-    "rebounding": [
-        "rebounds_per_100",
-        "defensive_rebound_rate",
-        "rebounding",
-    ],
-    "defense": [
-        "steal_rate",
-        "block_rate",
-        "defensive_rebound_rate",
-        "foul_rate",
-        "perimeter_defense",
-        "interior_defense",
-        "two_way_impact",
-    ],
+    group: list(features)
+    for group, features in RECOMMENDATION_FEATURE_GROUPS.items()
+    if group != "physical"
 }
 
 FOCUSED_PROFILE_FEATURES: dict[str, list[str]] = {
     "scoring_profile": [
-        "points_per_100",
         "usage_pct",
-        "true_shooting_pct",
-        "three_point_attempt_rate",
-        "free_throw_rate",
+        *RECOMMENDATION_FEATURE_GROUPS["scoring"],
     ],
     "defensive_profile": [
-        "steal_rate",
-        "block_rate",
+        *RECOMMENDATION_FEATURE_GROUPS["defense"],
         "defensive_rebound_rate",
-        "foul_rate",
     ],
 }
 
 PHYSICAL_FEATURES = ["height", "weight"]
-ALL_RECOMMENDER_FEATURES = sorted(
-    {feature for features in STAT_FEATURE_GROUPS.values() for feature in features}
-    | set(PHYSICAL_FEATURES)
-)
+ALL_RECOMMENDER_FEATURES = list(RECOMMENDATION_FEATURES)
 FORM_FEATURES = [
     "pts_last_5_minus_season_avg",
     "ast_last_5_minus_season_avg",
     "reb_last_5_minus_season_avg",
     "min_last_5_minus_season_avg",
 ]
+LEGACY_COLLAPSE_FEATURES = [
+    "scoring_creation",
+    "playmaking",
+    "shooting",
+    "rim_pressure",
+    "rebounding",
+    "perimeter_defense",
+    "interior_defense",
+    "two_way_impact",
+]
 
 RANKING_PRESETS: dict[str, dict[str, float]] = {
-    "role_similarity": {
-        "role_similarity_score": 1.00,
-        "workload_reliability_score": 0.00,
-        "physical_match_score": 0.00,
-    },
-    "playing_profile": {
-        "role_similarity_score": 0.85,
-        "workload_reliability_score": 0.10,
-        "physical_match_score": 0.05,
-    },
-    "scoring_profile": {
-        "scoring_profile_score": 1.00,
-    },
-    "defensive_profile": {
-        "defensive_profile_score": 1.00,
-    },
-    "workload_fit": {
-        "role_similarity_score": 0.75,
-        "workload_reliability_score": 0.25,
-        "physical_match_score": 0.00,
-    },
-    "physical_role_fit": {
-        "role_similarity_score": 0.75,
-        "workload_reliability_score": 0.05,
-        "physical_match_score": 0.20,
-    },
+    "role_similarity": {"role_similarity_score": 1.00},
+    "playing_profile": {"playing_profile_score": 1.00},
+    "scoring_profile": {"scoring_profile_score": 1.00},
+    "defensive_profile": {"defensive_profile_score": 1.00},
+    "workload_fit": {"workload_fit_score": 1.00},
+    "physical_role_fit": {"physical_role_fit_score": 1.00},
 }
 
 
@@ -166,7 +127,7 @@ def collapse_player_season_stints(base_df: pd.DataFrame) -> pd.DataFrame:
 
     weighted_columns = [
         column
-        for column in [*ALL_RECOMMENDER_FEATURES, *FORM_FEATURES]
+        for column in [*ALL_RECOMMENDER_FEATURES, *LEGACY_COLLAPSE_FEATURES, *FORM_FEATURES]
         if column != "minutes" and column in base_df.columns
     ]
     collapsed_rows = []
@@ -294,15 +255,14 @@ def standardized_group_distance(
     target_index: int,
     features: list[str],
 ) -> pd.Series:
-    """Return standardized profile distances from one target row."""
-    available = [feature for feature in features if feature in scoring_df.columns]
+    """Return distance in features normalized against each complete season pool."""
+    available = [normalized_feature_name(feature) for feature in features]
+    available = [feature for feature in available if feature in scoring_df.columns]
     if not available:
         return pd.Series(np.nan, index=scoring_df.index)
     matrix = scoring_df[available].apply(pd.to_numeric, errors="coerce")
-    matrix = matrix.fillna(matrix.median(numeric_only=True)).fillna(0)
-    scaled = StandardScaler().fit_transform(matrix)
-    target_vector = scaled[target_index]
-    distances = np.sqrt(((scaled - target_vector) ** 2).mean(axis=1))
+    target_vector = matrix.iloc[target_index].to_numpy(dtype="float64")
+    distances = np.sqrt(np.square(matrix.to_numpy(dtype="float64") - target_vector).mean(axis=1))
     return pd.Series(distances, index=scoring_df.index)
 
 
@@ -311,22 +271,34 @@ def add_similarity_scores(target: pd.Series, candidates: pd.DataFrame) -> pd.Dat
     scoring_df = pd.concat([target.to_frame().T, candidates], ignore_index=True)
     result = scoring_df.iloc[1:].copy()
 
-    group_distance_cols = []
-    for group_name, features in STAT_FEATURE_GROUPS.items():
+    for group_name, features in RECOMMENDATION_FEATURE_GROUPS.items():
         distances = standardized_group_distance(scoring_df, target_index=0, features=features)
         distance_col = f"{group_name}_distance"
         score_col = f"{group_name}_score"
         result[distance_col] = distances.iloc[1:].to_numpy(dtype="float64")
         result[score_col] = 1 / (1 + result[distance_col])
-        group_distance_cols.append(distance_col)
 
     for profile_name, features in FOCUSED_PROFILE_FEATURES.items():
         distances = standardized_group_distance(scoring_df, target_index=0, features=features)
         result[f"{profile_name}_distance"] = distances.iloc[1:].to_numpy(dtype="float64")
         result[f"{profile_name}_score"] = 1 / (1 + result[f"{profile_name}_distance"])
 
-    result["role_similarity_distance"] = result[group_distance_cols].mean(axis=1)
+    role_distances = standardized_group_distance(
+        scoring_df,
+        target_index=0,
+        features=list(PRESET_FEATURES["role_similarity"]),
+    )
+    result["role_similarity_distance"] = role_distances.iloc[1:].to_numpy(dtype="float64")
     result["role_similarity_score"] = 1 / (1 + result["role_similarity_distance"])
+
+    for preset in ("playing_profile", "workload_fit", "physical_role_fit"):
+        distances = standardized_group_distance(
+            scoring_df,
+            target_index=0,
+            features=list(PRESET_FEATURES[preset]),
+        )
+        result[f"{preset}_distance"] = distances.iloc[1:].to_numpy(dtype="float64")
+        result[f"{preset}_score"] = 1 / (1 + result[f"{preset}_distance"])
 
     physical_distances = standardized_group_distance(scoring_df, target_index=0, features=PHYSICAL_FEATURES)
     result["physical_distance"] = physical_distances.iloc[1:].to_numpy(dtype="float64")
@@ -390,8 +362,18 @@ def recommend_players(
     same_season: bool = True,
     same_position_group: bool = True,
     minutes_min: float | None = 500,
+    ranker_artifact: RecommendationRankerArtifact | None = None,
 ) -> pd.DataFrame:
     """Return ranked player recommendations with grouped explanations."""
+    normalized_columns = [normalized_feature_name(feature) for feature in RECOMMENDATION_FEATURES]
+    if not set(normalized_columns).issubset(base_df.columns):
+        preprocessor = (
+            ranker_artifact.preprocessor
+            if ranker_artifact is not None
+            else SeasonFeaturePreprocessor(prior_strength=DEFAULT_SHRINKAGE_PRIOR_STRENGTH).fit(base_df)
+        )
+        base_df = preprocessor.transform(base_df)
+
     target = select_target_row(base_df, player_name=player_name, season=season)
     candidates = generate_candidates(
         base_df=base_df,
@@ -406,6 +388,20 @@ def recommend_players(
     scored = add_similarity_scores(target, candidates)
     scored = add_practical_scores(target, scored)
     scored = add_final_score(scored, preset=preset)
+    ranking_algorithm = "season_normalized_euclidean"
+    ranker_version = "deterministic-v2"
+    if preset == "playing_profile" and ranker_artifact is not None:
+        if ranker_artifact.algorithm in {"lambdamart", "mahalanobis", "season_normalized_euclidean"}:
+            scored["recommendation_score"] = ranker_artifact.score(target, scored)
+            ranking_algorithm = ranker_artifact.algorithm
+            ranker_version = ranker_artifact.version
+        elif ranker_artifact.algorithm == "weighted_euclidean_v1":
+            # The selection artifact records that no challenger passed. Serving
+            # keeps the stable deterministic implementation as a safe fallback.
+            ranking_algorithm = "season_normalized_euclidean"
+            ranker_version = ranker_artifact.version
+    scored["ranking_algorithm"] = ranking_algorithm
+    scored["ranker_version"] = ranker_version
     scored["target_player_name"] = target["player_name"]
     scored["target_player_id"] = target["player_id"]
     scored["target_season"] = target["season"]
@@ -442,6 +438,8 @@ def recommend_players(
         "matched_groups",
         "recommendation_reason",
         "ranking_preset",
+        "ranking_algorithm",
+        "ranker_version",
     ]
     output_cols = [col for col in output_cols if col in scored.columns]
     return scored[output_cols].sort_values("recommendation_score", ascending=False).head(top_n).reset_index(drop=True)

@@ -21,7 +21,12 @@ from src.evaluation.evaluate_similarity import (
     recommendation_cluster_agreement,
 )
 from src.scouting.compensation import build_player_compensation_context
-from src.scouting.recommendation import ALL_RECOMMENDER_FEATURES, build_recommendation_base, recommend_players
+from src.scouting.ranking import RecommendationRankerArtifact, SeasonFeaturePreprocessor
+from src.scouting.recommendation import (
+    ALL_RECOMMENDER_FEATURES,
+    build_recommendation_base,
+    recommend_players,
+)
 
 
 @dataclass(frozen=True)
@@ -33,11 +38,13 @@ class RecommendationPipelineData:
     contract_history: pd.DataFrame
     profile_clusters: pd.DataFrame
     future_ground_truth: pd.DataFrame
+    ranker_artifact: RecommendationRankerArtifact | None = None
 
 
 def load_recommendation_pipeline_data(
     data_dir: Path | str = "data",
     cluster_target_size: int = 8,
+    ranker_artifact: RecommendationRankerArtifact | None = None,
 ) -> RecommendationPipelineData:
     # Load gold datasets and construct recommendation evaluation artifacts.
     """Load all data required for player recommendation and detail context."""
@@ -51,6 +58,12 @@ def load_recommendation_pipeline_data(
         role_df=role_features,
         performance_df=performance,
     )
+    preprocessor = (
+        ranker_artifact.preprocessor
+        if ranker_artifact is not None
+        else SeasonFeaturePreprocessor().fit(recommendation_base)
+    )
+    recommendation_base = preprocessor.transform(recommendation_base)
     profile_clusters = build_profile_clusters(
         recommendation_base,
         features=ALL_RECOMMENDER_FEATURES,
@@ -66,6 +79,7 @@ def load_recommendation_pipeline_data(
         contract_history=contract_history,
         profile_clusters=profile_clusters,
         future_ground_truth=future_ground_truth,
+        ranker_artifact=ranker_artifact,
     )
 
 
@@ -90,6 +104,7 @@ def recommend_similar_players(
         same_season=same_season,
         same_position_group=same_position_group,
         minutes_min=minutes_min,
+        ranker_artifact=pipeline_data.ranker_artifact,
     )
 
 

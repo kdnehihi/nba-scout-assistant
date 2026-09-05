@@ -9,8 +9,14 @@ const shortTermMetrics = document.querySelector("#shortTermMetrics");
 const longTermMetrics = document.querySelector("#longTermMetrics");
 const compensationBlock = document.querySelector("#compensationBlock");
 const recentPerformance = document.querySelector("#recentPerformance");
+const appLayout = document.querySelector("#appLayout");
+const candidatesPanel = document.querySelector("#candidatesPanel");
+const submitButton = document.querySelector("#submitButton");
+const modeButtons = [...document.querySelectorAll(".mode-button")];
+const candidateControls = [...document.querySelectorAll(".candidate-control")];
 
 let activeCandidateKey = "";
+let activeMode = "recommend";
 
 function setMessage(text, isError = false) {
   message.textContent = text || "";
@@ -66,9 +72,9 @@ function metric(label, value) {
   return item;
 }
 
-function clearReport() {
+function clearReport(prompt = "Select a candidate to load the report.") {
   selectedPlayer.textContent = "No player selected";
-  profileMetrics.innerHTML = '<div class="empty">Select a candidate to load the report.</div>';
+  profileMetrics.innerHTML = `<div class="empty">${prompt}</div>`;
   shortTermMetrics.innerHTML = '<div class="empty">No forecast loaded.</div>';
   longTermMetrics.innerHTML = '<div class="empty">No forecast loaded.</div>';
   compensationBlock.innerHTML = '<div class="empty">No compensation data loaded.</div>';
@@ -105,7 +111,14 @@ function renderCandidates(candidates) {
       </div>
       <div class="candidate-score">${score === undefined ? "N/A" : formatNumber(score, 3)}</div>
     `;
-    button.addEventListener("click", () => loadReport(candidate, key));
+    button.addEventListener("click", () => {
+      void loadPlayerReport({
+        playerId,
+        playerName,
+        season,
+        candidateKey: key,
+      });
+    });
     candidateList.appendChild(button);
   });
 }
@@ -247,15 +260,12 @@ function renderRecentPerformance(rows) {
   `;
 }
 
-async function loadReport(candidate, key) {
-  activeCandidateKey = key;
+async function loadPlayerReport({ playerId = null, playerName = null, season = null, candidateKey = "" }) {
+  activeCandidateKey = candidateKey;
   document.querySelectorAll(".candidate-button").forEach((button) => {
     button.classList.toggle("active", button.dataset.key === activeCandidateKey);
   });
 
-  const season = candidate.season || document.querySelector("#season").value || null;
-  const playerId = candidate.player_id ?? candidate.candidate_player_id;
-  const playerName = candidate.player_name ?? candidate.candidate_player_name;
   selectedPlayer.textContent = playerName || "Loading report";
   setMessage(`Loading report for ${playerName || playerId}...`);
 
@@ -264,7 +274,7 @@ async function loadReport(candidate, key) {
       player_id: playerId ?? null,
       player_name: playerId ? null : playerName,
       season,
-      anchor_season: season,
+      anchor_season: season || null,
       include_forecasts: true,
       short_term_tasks: ["points", "assists", "rebounds"],
       long_term_tasks: ["active_probability", "pts_per_36", "ast_per_36", "reb_per_36"],
@@ -277,23 +287,58 @@ async function loadReport(candidate, key) {
     renderLongTerm(report.long_term_forecast);
     renderCompensation(report.compensation);
     renderRecentPerformance(report.recent_performance);
-    setMessage("Report loaded.");
+    const warnings = report.warnings || [];
+    setMessage(warnings.length ? `Report loaded with limited forecasts. ${warnings.join(" ")}` : "Report loaded.");
+    return true;
   } catch (error) {
     setMessage(error.message, true);
+    return false;
   }
 }
 
-async function submitRecommendation(event) {
+function setMode(mode) {
+  activeMode = mode;
+  const analyze = mode === "analyze";
+  modeButtons.forEach((button) => {
+    const selected = button.dataset.mode === mode;
+    button.classList.toggle("active", selected);
+    button.setAttribute("aria-selected", String(selected));
+  });
+  candidateControls.forEach((control) => {
+    control.hidden = analyze;
+  });
+  candidatesPanel.hidden = analyze;
+  appLayout.classList.toggle("analysis-mode", analyze);
+  submitButton.textContent = analyze ? "Analyze Player" : "Find Similar Players";
+  renderCandidates([]);
+  clearReport(analyze ? "Run analysis to load the player report." : "Select a candidate to load the report.");
+  setMessage("");
+}
+
+async function submitSearch(event) {
   event.preventDefault();
-  const submitButton = form.querySelector("button[type='submit']");
   submitButton.disabled = true;
+  const playerName = document.querySelector("#playerName").value.trim();
+  const season = document.querySelector("#season").value.trim() || null;
+
+  if (activeMode === "analyze") {
+    setMessage(`Loading report for ${playerName}...`);
+    clearReport("Loading player report...");
+    try {
+      await loadPlayerReport({ playerName, season });
+    } finally {
+      submitButton.disabled = false;
+    }
+    return;
+  }
+
   setMessage("Finding similar players...");
   clearReport();
 
   const minutesValue = document.querySelector("#minutesMin").value;
   const payload = {
-    player_name: document.querySelector("#playerName").value.trim(),
-    season: document.querySelector("#season").value.trim() || null,
+    player_name: playerName,
+    season,
     top_n: Number(document.querySelector("#topN").value || 5),
     preset: document.querySelector("#preset").value,
     same_season: document.querySelector("#sameSeason").checked,
@@ -334,6 +379,10 @@ async function checkService() {
   }
 }
 
-form.addEventListener("submit", submitRecommendation);
+modeButtons.forEach((button) => {
+  button.addEventListener("click", () => setMode(button.dataset.mode));
+});
+form.addEventListener("submit", submitSearch);
+setMode("recommend");
 clearReport();
 checkService();

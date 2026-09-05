@@ -20,6 +20,7 @@ COPY --chown=app:app app ./app
 COPY --chown=app:app src ./src
 COPY --from=runtime_snapshot --chown=app:app /app/data ./data
 COPY --from=runtime_snapshot --chown=app:app /app/artifacts ./artifacts
+COPY --chown=app:app artifacts/recommendation_playing_profile_ranker.joblib ./artifacts/
 
 USER app
 

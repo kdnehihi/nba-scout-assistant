@@ -6,7 +6,6 @@ from pydantic import Field
 
 from app.schemas.common import PlayerLookupRequest
 
-
 ShortTermTask = Literal["points", "assists", "rebounds"]
 LongTermHorizon = Literal[1, 2, 3]
 LongTermTask = Literal[

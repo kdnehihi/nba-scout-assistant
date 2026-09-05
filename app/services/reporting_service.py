@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.api_utils import json_safe
-from src.pipelines.reporting import build_player_scouting_report, build_service_metadata
-
 from app.schemas.scouting import ScoutingReportRequest
 from app.services.resources import AppResources
+from src.api_utils import json_safe
+from src.pipelines.reporting import build_player_scouting_report, build_service_metadata
 
 
 def build_metadata_response(resources: AppResources) -> dict[str, Any]:

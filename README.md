@@ -28,13 +28,13 @@ AWS ECS Fargate deployment.
 | Area | Status | Current implementation |
 | --- | --- | --- |
 | Data pipeline | Complete | Raw/bronze/silver/gold processing with validation and temporal splits |
-| Player recommendation | Complete | Six configurable ranking presets, position/minutes filters, explanations, and proxy evaluation |
+| Player recommendation | Complete | LambdaMART `playing_profile`, five deterministic presets, filters, explanations, and locked temporal evaluation |
 | Short-term forecasting | Complete | Three deployed PyTorch LSTMs for next-five-game PTS, AST, and REB averages |
 | Long-term forecasting | Complete | Availability and per-36 production forecasts for H1, H2, and H3 |
 | Player report | Complete | Profile, recent performance, forecasts, salary history, and optional contract context |
 | API and frontend | Complete | FastAPI endpoints and a responsive static dashboard served by the same container |
 | Experiment tracking | Complete | MLflow parameters, metrics, artifacts, and reusable checkpoints |
-| Testing and delivery | Complete | 78 automated tests, GitHub Actions CI, Docker Hub publishing, and ECS deployment |
+| Testing and delivery | Complete | Automated tests, GitHub Actions CI, Docker Hub publishing, and ECS deployment |
 | Cloud runtime | Live demo | Single-container AWS ECS Fargate service in `us-east-2` |
 | Automated data refresh | Pipeline ready | BALLDONTLIE incremental Bronze/Silver/Gold inference refresh with checkpointing; cloud scheduling remains pending |
 
@@ -47,56 +47,85 @@ The deployed serving snapshot currently contains:
 12,386 salary-history rows
 3 short-term model artifacts
 12 long-term task/horizon artifacts
+1 versioned recommendation ranker artifact
 Seasons 2016-17 through 2024-25
 ```
 
 ## Product Workflow
 
 ```text
-Player search
+Find Similar
     -> candidate filtering by season, position group, and minimum minutes
-    -> standardized statistical-profile similarity
-    -> preset-based Top-K ranking with explanations
-    -> candidate scouting report
+    -> LambdaMART playing-profile ranking or deterministic focused preset
+    -> Top-K ranking with explanations
+    -> selected candidate scouting report
          -> recent performance
          -> next-five-game forecasts
          -> H1/H2/H3 long-term forecasts
          -> salary and optional contract history
+
+Analyze Player
+    -> direct name and optional season lookup
+    -> the same complete scouting report
 ```
 
-The current UI automatically opens the highest-ranked candidate and retrieves
-the complete report without reloading the page.
+The UI offers `Find Similar` and `Analyze Player` modes. Recommendation mode
+automatically opens the highest-ranked candidate; direct analysis loads the
+same report components for the entered player without creating a candidate list.
 
 ## Core Capabilities
 
 ### Player recommendation
 
 The recommender works on one player-season profile per player. Multi-team
-stints are collapsed with minutes-weighted statistics before scoring. Candidate
-features are standardized within the scoring pool, and distance is converted to
-a readable score using `1 / (1 + distance)`.
+stints are collapsed with minutes-weighted statistics before scoring. It uses
+15 non-overlapping observed workload, scoring, playmaking, rebounding, defense,
+and physical fields. No age or derived composite dimension is included.
+
+Noisy rate statistics receive minutes-based empirical-Bayes shrinkage, then
+all fields are normalized against the complete season player pool. This
+preprocessing is persisted and is never refitted on one request's filtered
+candidate set.
 
 Available ranking presets:
 
 | Preset | Ranking focus |
 | --- | --- |
-| `playing_profile` | 85% role similarity, 10% workload reliability, 5% physical match |
-| `role_similarity` | Pure statistical role similarity |
+| `playing_profile` | Selected XGBoost LambdaMART ranker over the complete observed profile |
+| `role_similarity` | Deterministic observed workload and performance similarity |
 | `scoring_profile` | Scoring volume, usage, efficiency, 3PA rate, and free-throw rate |
 | `defensive_profile` | Steal, block, defensive-rebound, and foul rates |
-| `workload_fit` | Role similarity with greater minutes reliability weight |
-| `physical_role_fit` | Role similarity with greater height/weight match weight |
+| `workload_fit` | Deterministic minutes and usage similarity |
+| `physical_role_fit` | Deterministic workload, height, and weight similarity |
 
 Role similarity covers workload, scoring, playmaking, rebounding, and defensive
 feature groups. Age is not used as a similarity feature. Candidate filtering
 can enforce the same season, same position group, and a minimum-minutes floor.
 
-Recommendation quality is audited with two proxy ground-truth layers:
+The learned ranker uses next-season profile similarity as graded proxy truth:
+future ranks 1-5 receive relevance 5-1 and all other candidates receive zero.
+Queries use 2016-17 through 2021-22 for training, 2022-23 for validation, and
+2023-24 as the locked test. The 2024-25 season is inference-only because a
+2025-26 proxy outcome is unavailable.
+
+Recommendation quality is audited with:
 
 - KMeans profile-cluster agreement checks whether recommendations occupy a
   similar unsupervised statistical cluster.
-- Next-season profile similarity provides precision, recall, hit-rate, and MRR
-  diagnostics against future statistical outcomes.
+- Next-season profile similarity provides NDCG@5, Recall@5, hit rate, MRR, and
+  coverage against future statistical outcomes.
+- A paired query bootstrap and p50/p95 latency gate determine whether a
+  challenger is promoted.
+
+The selected LambdaMART challenger improved locked-test ranking metrics over
+the previous weighted Euclidean champion and passed the bootstrap and latency
+requirements. Full design and reproducibility details are in
+[docs/recommendation_ranking.md](docs/recommendation_ranking.md).
+
+| Locked-test algorithm | NDCG@5 | Recall@5 | MRR |
+| --- | ---: | ---: | ---: |
+| Previous weighted Euclidean | 0.171 | 0.174 | 0.360 |
+| Selected LambdaMART | 0.211 | 0.208 | 0.421 |
 
 ### Short-term forecasting
 
@@ -263,8 +292,8 @@ app/static/app.js
 
 FastAPI mounts these files at `/`, so the UI and API share one origin and one
 container. The interface supports recommendation filters, six ranking presets,
-candidate selection, profile metrics, short- and long-term forecasts, salary
-history, and recent-game summaries.
+candidate selection, direct player analysis, profile metrics, short- and
+long-term forecasts, salary history, and recent-game summaries.
 
 ## Local Usage
 
@@ -313,6 +342,9 @@ python -m src.training.train_short_term --task rebounds
 # Train one or all long-term task/horizon combinations
 python -m src.training.train_long_term --task pts_per_36 --horizon 1
 python -m src.training.train_long_term --task all
+
+# Tune, gate, and persist the recommendation ranker
+python -m src.training.train_recommendation --trials 40
 
 # Evaluate a deployed short-term checkpoint
 python -m src.evaluation.evaluate_short_term \

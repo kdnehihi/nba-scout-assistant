@@ -1,15 +1,24 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pandas as pd
 
-from src.evaluation.evaluate_similarity import build_future_similarity_ground_truth, build_profile_clusters
+from src.evaluation.evaluate_similarity import (
+    build_future_similarity_ground_truth,
+    build_profile_clusters,
+)
 from src.pipelines.recommendation import (
     RecommendationPipelineData,
     build_recommended_player_detail,
     evaluate_recommendation_result,
     recommend_similar_players,
 )
-from src.scouting.recommendation import ALL_RECOMMENDER_FEATURES, build_recommendation_base
+from src.scouting.ranking import RecommendationRankerArtifact, SeasonFeaturePreprocessor
+from src.scouting.recommendation import (
+    ALL_RECOMMENDER_FEATURES,
+    build_recommendation_base,
+)
 from tests.test_scouting_recommendation import sample_role_features
 
 
@@ -60,3 +69,23 @@ def test_recommended_player_detail_uses_salary_context():
     context = build_recommended_player_detail(pipeline_data, player_id=2, player_name="Similar Guard")
 
     assert context["latest_salary"]["salary_usd"] == 12_000_000
+
+
+def test_recommendation_pipeline_supports_selected_ranker_and_fallback():
+    fallback_data = make_recommendation_pipeline_data()
+    fallback = recommend_similar_players(fallback_data, "Target Guard", season="2024-25", top_n=2)
+    preprocessor = SeasonFeaturePreprocessor().fit(fallback_data.recommendation_base)
+    artifact_data = replace(
+        fallback_data,
+        recommendation_base=preprocessor.transform(fallback_data.recommendation_base),
+        ranker_artifact=RecommendationRankerArtifact(
+            algorithm="season_normalized_euclidean",
+            preprocessor=preprocessor,
+            version="test-ranker",
+        ),
+    )
+    ranked = recommend_similar_players(artifact_data, "Target Guard", season="2024-25", top_n=2)
+
+    assert {"ranking_algorithm", "ranker_version"}.issubset(fallback.columns)
+    assert fallback["ranking_algorithm"].eq("season_normalized_euclidean").all()
+    assert ranked["ranker_version"].eq("test-ranker").all()

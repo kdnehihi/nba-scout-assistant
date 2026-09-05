@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.api_utils import json_safe
-from src.pipelines.recommendation import evaluate_recommendation_result, recommend_similar_players
-
 from app.schemas.recommendation import RecommendationRequest
 from app.services.resources import AppResources
+from src.api_utils import json_safe
+from src.pipelines.recommendation import (
+    evaluate_recommendation_result,
+    recommend_similar_players,
+)
 
 
 def build_recommendation_response(

@@ -40,6 +40,7 @@ COPY --chown=app:app \
     artifacts/long_term_reb_per_36_h2_random_forest.joblib \
     artifacts/long_term_reb_per_36_h3_mlp.pt \
     artifacts/long_term_reb_per_36_h3_mlp_preprocessor.joblib \
+    artifacts/recommendation_playing_profile_ranker.joblib \
     ./artifacts/
 
 USER app

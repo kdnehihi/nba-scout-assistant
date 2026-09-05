@@ -4,7 +4,6 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-
 RecommendationPreset = Literal[
     "playing_profile",
     "role_similarity",

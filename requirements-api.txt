@@ -11,4 +11,5 @@ pyarrow>=18.0,<22.0
 
 # Persisted model compatibility
 scikit-learn==1.6.1
+xgboost>=3.0,<4.0
 joblib>=1.4,<2.0

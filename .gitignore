@@ -23,7 +23,8 @@ env/
 !/data/.gitignore
 !/data/*.dvc
 /models/
-/artifacts/
+/artifacts/*
+!/artifacts/recommendation_playing_profile_ranker.joblib
 mlruns/
 mlflow.db
 mlartifacts/

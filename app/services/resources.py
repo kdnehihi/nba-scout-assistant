@@ -8,9 +8,13 @@ import pandas as pd
 
 from src.pipelines.artifacts import (
     load_long_term_model_artifacts,
+    load_recommendation_ranker_artifact,
     load_short_term_model_artifacts,
 )
-from src.pipelines.forecasting import load_long_term_prediction_data, load_short_term_prediction_data
+from src.pipelines.forecasting import (
+    load_long_term_prediction_data,
+    load_short_term_prediction_data,
+)
 from src.pipelines.recommendation import (
     RecommendationPipelineData,
     load_recommendation_pipeline_data,
@@ -31,8 +35,12 @@ def load_app_resources(
     artifact_dir: str | Path = "artifacts",
 ) -> AppResources:
     """Load data and model artifacts used by API services."""
+    recommendation_ranker = load_recommendation_ranker_artifact(artifact_dir, required=False)
     return AppResources(
-        recommendation_data=load_recommendation_pipeline_data(data_dir),
+        recommendation_data=load_recommendation_pipeline_data(
+            data_dir,
+            ranker_artifact=recommendation_ranker,
+        ),
         short_term_data=load_short_term_prediction_data(data_dir),
         long_term_data=load_long_term_prediction_data(data_dir),
         short_term_models=load_short_term_model_artifacts(artifact_dir),

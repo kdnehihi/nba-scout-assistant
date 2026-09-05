@@ -1,3 +1,4 @@
+# ruff: noqa: I001
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -5,12 +6,18 @@ from pathlib import Path
 from typing import Any
 
 import joblib
+import xgboost as _xgboost  # noqa: F401  # Load its OpenMP runtime before torch on macOS.
 import torch
 
 from src.config.long_term_config import LONG_TERM_HORIZONS, LONG_TERM_FORECAST_TASKS, LongTermTaskConfig
 from src.config.lstm_config import LSTM_TASK_CONFIG, LSTMTaskConfig
 from src.models.lstm import ShortTermLSTM
 from src.models.mlp import LongTermMLP
+from src.config.recommendation_config import RECOMMENDATION_RANKER_FILENAME
+from src.scouting.ranking import (
+    RecommendationRankerArtifact,
+    load_recommendation_ranker_artifact as _load_recommendation_ranker_artifact,
+)
 
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -196,3 +203,12 @@ def load_long_term_model_artifacts(
         )
         for task_config in task_configs
     }
+
+
+def load_recommendation_ranker_artifact(
+    artifact_dir: Path | str,
+    required: bool = False,
+) -> RecommendationRankerArtifact | None:
+    """Load the selected playing-profile ranker when it is available."""
+    path = Path(artifact_dir) / RECOMMENDATION_RANKER_FILENAME
+    return _load_recommendation_ranker_artifact(path, required=required)

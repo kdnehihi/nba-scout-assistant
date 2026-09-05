@@ -116,6 +116,47 @@ h3 {
   margin-top: 18px;
 }
 
+.mode-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px;
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 3px;
+  background: var(--panel-strong);
+}
+
+.mode-button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 4px;
+  padding: 7px 9px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mode-button.active {
+  background: var(--panel);
+  color: var(--accent-strong);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+.layout.analysis-mode {
+  grid-template-columns: minmax(280px, 340px) minmax(520px, 1fr);
+}
+
+.layout.analysis-mode .field-row {
+  grid-template-columns: 1fr;
+}
+
+[hidden] {
+  display: none !important;
+}
+
 label {
   display: grid;
   gap: 6px;
@@ -346,6 +387,14 @@ th {
   .report-panel {
     grid-column: 1 / -1;
   }
+
+  .layout.analysis-mode {
+    grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  }
+
+  .layout.analysis-mode .report-panel {
+    grid-column: auto;
+  }
 }
 
 @media (max-width: 760px) {
@@ -357,6 +406,10 @@ th {
   .layout {
     grid-template-columns: 1fr;
     padding: 12px;
+  }
+
+  .layout.analysis-mode {
+    grid-template-columns: 1fr;
   }
 
   .report-panel {

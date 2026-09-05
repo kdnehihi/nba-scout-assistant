@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.api_utils import json_safe
-from src.pipelines.forecasting import predict_long_term_tasks, predict_short_term_tasks
-
 from app.schemas.forecasting import PredictLongTermRequest, PredictShortTermRequest
 from app.services.resources import AppResources
+from src.api_utils import json_safe
+from src.pipelines.forecasting import predict_long_term_tasks, predict_short_term_tasks
 
 
 def build_short_term_forecast_response(

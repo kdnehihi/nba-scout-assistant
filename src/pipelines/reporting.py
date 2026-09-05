@@ -7,7 +7,10 @@ import pandas as pd
 from src.api_utils import json_safe
 from src.dataset.cleaning import normalize_name_key
 from src.pipelines.forecasting import predict_long_term_tasks, predict_short_term_tasks
-from src.pipelines.recommendation import RecommendationPipelineData, build_recommended_player_detail
+from src.pipelines.recommendation import (
+    RecommendationPipelineData,
+    build_recommended_player_detail,
+)
 
 
 def _json_records(df: pd.DataFrame, limit: int | None = None) -> list[dict[str, Any]]:
@@ -130,27 +133,55 @@ def build_player_scouting_report(
             sort_cols=["anchor_season_start_year"],
             limit=1,
         ),
+        "warnings": [],
     }
 
     if include_forecasts and short_term_models is not None:
-        report["short_term_forecast"] = predict_short_term_tasks(
-            performance_df=performance_df,
-            artifacts=short_term_models,
-            tasks=short_term_tasks,
-            player_id=selected_player_id,
-            season=season,
-            as_of_date=as_of_date,
-        )
+        report["short_term_forecast"] = {}
+        selected_short_tasks = list(short_term_tasks or short_term_models)
+        for task in selected_short_tasks:
+            if task not in short_term_models:
+                report["warnings"].append(f"Short-term forecast unavailable for {task}: model not loaded")
+                continue
+            try:
+                report["short_term_forecast"].update(
+                    predict_short_term_tasks(
+                        performance_df=performance_df,
+                        artifacts=short_term_models,
+                        tasks=[task],
+                        player_id=selected_player_id,
+                        season=season,
+                        as_of_date=as_of_date,
+                    )
+                )
+            except (KeyError, ValueError) as error:
+                report["warnings"].append(f"Short-term forecast unavailable for {task}: {error}")
 
     if include_forecasts and long_term_models is not None:
-        report["long_term_forecast"] = predict_long_term_tasks(
-            long_term_df=long_term_df,
-            artifacts=long_term_models,
-            tasks=long_term_tasks,
-            horizons=long_term_horizons,
-            player_id=selected_player_id,
-            anchor_season=anchor_season,
-        )
+        report["long_term_forecast"] = {}
+        selected_long_tasks = list(long_term_tasks or sorted({task for task, _ in long_term_models}))
+        for task in selected_long_tasks:
+            task_artifacts = {
+                key: artifact
+                for key, artifact in long_term_models.items()
+                if key[0] == task and (long_term_horizons is None or key[1] in long_term_horizons)
+            }
+            if not task_artifacts:
+                report["warnings"].append(f"Long-term forecast unavailable for {task}: model not loaded")
+                continue
+            try:
+                report["long_term_forecast"].update(
+                    predict_long_term_tasks(
+                        long_term_df=long_term_df,
+                        artifacts=task_artifacts,
+                        tasks=[task],
+                        horizons=long_term_horizons,
+                        player_id=selected_player_id,
+                        anchor_season=anchor_season,
+                    )
+                )
+            except (KeyError, ValueError) as error:
+                report["warnings"].append(f"Long-term forecast unavailable for {task}: {error}")
 
     return report
 
@@ -165,16 +196,25 @@ def build_service_metadata(
     # Summarize loaded service data and model artifacts for local debugging.
     """Return loaded data/model metadata for the API."""
     return {
-        "recommendation_base_rows": int(len(recommendation_data.recommendation_base)),
-        "performance_rows": int(len(performance_df)),
-        "long_term_rows": int(len(long_term_df)),
-        "salary_history_rows": int(len(recommendation_data.salary_history)),
-        "contract_history_rows": int(len(recommendation_data.contract_history)),
+        "recommendation_base_rows": len(recommendation_data.recommendation_base),
+        "performance_rows": len(performance_df),
+        "long_term_rows": len(long_term_df),
+        "salary_history_rows": len(recommendation_data.salary_history),
+        "contract_history_rows": len(recommendation_data.contract_history),
         "short_term_models": sorted(short_term_models.keys()),
         "long_term_models": [
             {"task": task, "horizon": horizon}
             for task, horizon in sorted(long_term_models.keys())
         ],
+        "recommendation_ranker": {
+            "algorithm": recommendation_data.ranker_artifact.algorithm,
+            "version": recommendation_data.ranker_artifact.version,
+        }
+        if recommendation_data.ranker_artifact is not None
+        else {
+            "algorithm": "season_normalized_euclidean",
+            "version": "deterministic-v2",
+        },
         "recommendation_seasons": sorted(recommendation_data.recommendation_base["season"].dropna().unique().tolist())
         if "season" in recommendation_data.recommendation_base.columns
         else [],

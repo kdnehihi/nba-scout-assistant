@@ -15,9 +15,17 @@
       <div class="status" id="serviceStatus">Checking service</div>
     </header>
 
-    <main class="layout">
+    <main class="layout" id="appLayout">
       <section class="panel search-panel" aria-labelledby="searchTitle">
         <h2 id="searchTitle">Search</h2>
+        <div class="mode-control" role="tablist" aria-label="Analysis mode">
+          <button type="button" class="mode-button active" data-mode="recommend" role="tab" aria-selected="true">
+            Find Similar
+          </button>
+          <button type="button" class="mode-button" data-mode="analyze" role="tab" aria-selected="false">
+            Analyze Player
+          </button>
+        </div>
         <form id="recommendationForm" class="form">
           <label>
             Player name
@@ -29,13 +37,13 @@
               Season
               <input id="season" name="season" type="text" value="2024-25" placeholder="2024-25" />
             </label>
-            <label>
+            <label class="candidate-control">
               Top K
               <input id="topN" name="topN" type="number" value="5" min="1" max="25" />
             </label>
           </div>
 
-          <label>
+          <label class="candidate-control">
             Profile preset
             <select id="preset" name="preset">
               <option value="playing_profile">Playing profile</option>
@@ -45,7 +53,7 @@
             </select>
           </label>
 
-          <div class="toggles">
+          <div class="toggles candidate-control">
             <label>
               <input id="sameSeason" type="checkbox" checked />
               Same season
@@ -56,18 +64,18 @@
             </label>
           </div>
 
-          <label>
+          <label class="candidate-control">
             Minimum minutes
             <input id="minutesMin" name="minutesMin" type="number" value="500" min="0" step="50" />
           </label>
 
-          <button type="submit" class="primary-button">Find Similar Players</button>
+          <button id="submitButton" type="submit" class="primary-button">Find Similar Players</button>
         </form>
 
         <div class="message" id="message"></div>
       </section>
 
-      <section class="panel candidates-panel" aria-labelledby="candidatesTitle">
+      <section class="panel candidates-panel" id="candidatesPanel" aria-labelledby="candidatesTitle">
         <div class="section-heading">
           <h2 id="candidatesTitle">Candidates</h2>
           <span id="candidateCount">0</span>
