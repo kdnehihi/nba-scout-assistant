@@ -35,7 +35,7 @@ AWS ECS Fargate deployment.
 | API and frontend | Complete | FastAPI endpoints and a responsive static dashboard served by the same container |
 | Experiment tracking | Complete | MLflow parameters, metrics, artifacts, and reusable checkpoints |
 | Testing and delivery | Complete | Automated tests, GitHub Actions CI, Docker Hub publishing, and ECS deployment |
-| Cloud runtime | Live demo | Single-container AWS ECS Fargate service in `us-east-2` |
+| Cloud runtime | Live demo | AWS ECS Fargate API with optional shared Redis response caching |
 | Automated data refresh | Pipeline ready | BALLDONTLIE incremental Bronze/Silver/Gold inference refresh with checkpointing; cloud scheduling remains pending |
 
 The deployed serving snapshot currently contains:
@@ -206,6 +206,7 @@ MLflow tracking + persisted model artifacts
         v
 FastAPI schemas -> services -> inference/reporting pipelines
         |
+        +-> Redis response cache (optional, fail-open)
         +-> JSON API
         +-> static HTML/CSS/JavaScript dashboard
         |
@@ -215,7 +216,9 @@ Docker Hub -> AWS ECS Fargate
 
 Application resources are loaded once during FastAPI startup and reused across
 requests. The service does not reload datasets or model artifacts for every
-prediction.
+prediction. When `REDIS_URL` is configured, successful recommendation,
+forecast, and scouting-report responses are cached with versioned keys. Redis
+failures do not block inference; the API falls back to normal computation.
 
 ## Data Sources
 
@@ -269,8 +272,8 @@ FastAPI entrypoint: `app/main.py`
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
-| `GET` | `/health` | Container and service health |
-| `GET` | `/metadata` | Loaded row counts, seasons, and model artifacts |
+| `GET` | `/health` | Container, service, and response-cache health |
+| `GET` | `/metadata` | Loaded rows, seasons, artifacts, runtime version, and cache statistics |
 | `POST` | `/recommendations` | Ranked Top-K similar players plus diagnostics |
 | `POST` | `/forecasts/short-term` | Requested next-five-game forecasts |
 | `POST` | `/forecasts/long-term` | Requested H1/H2/H3 trajectory forecasts |
@@ -324,6 +327,26 @@ Source execution requires the four serving datasets and selected artifacts in
 python -m pip install -r requirements-api.txt
 uvicorn app.main:app --host 0.0.0.0 --port 8001
 ```
+
+Redis is optional. To run the complete local API and cache stack:
+
+```bash
+docker compose up --build
+```
+
+To use a separately managed Redis instance:
+
+```bash
+export REDIS_URL=redis://localhost:6379/0
+export DATA_VERSION=local-2024-25
+uvicorn app.main:app --host 0.0.0.0 --port 8001
+```
+
+Response cache defaults are six hours for recommendations and one hour for
+forecasts and scouting reports. Cache keys include the runtime data/model
+version, so a new serving snapshot cannot reuse responses from an older one.
+Configuration and AWS deployment steps are documented in
+[docs/redis_cache.md](docs/redis_cache.md).
 
 ### Build from the local serving snapshot
 
@@ -392,6 +415,10 @@ Container: nba-scout-api
 Runtime: AWS Fargate, Linux/X86_64
 ```
 
+For multiple ECS tasks, a shared ElastiCache endpoint can be injected as the
+`REDIS_URL` task secret. Only the ECS task security group should be allowed to
+reach the cache on port `6379`; Redis must not be publicly reachable.
+
 Because serving binaries are ignored by Git, `docker/Dockerfile.cd` takes
 `/app/data` and `/app/artifacts` from the immutable `0.2.0` runtime snapshot,
 then rebuilds dependencies and application code from the SHA that passed CI.
@@ -422,6 +449,8 @@ docker/              local and CI/CD Dockerfiles
   snapshot; salary history remains available as reference context.
 - The current ECS demo uses a basic single-task deployment without a custom
   domain, HTTPS termination, or an Application Load Balancer.
+- Shared Redis caching is implemented but remains disabled until `REDIS_URL`
+  is configured in the ECS task definition.
 - Recommendation relevance uses defensible proxy ground truth because no
   universal labeled dataset of correct NBA player replacements exists.
 - Long-horizon forecasts should be interpreted as estimates, especially H3,
