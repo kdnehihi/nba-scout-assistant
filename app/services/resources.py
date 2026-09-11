@@ -1,11 +1,17 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
+from app.services.cache import (
+    NullResponseCache,
+    ResponseCache,
+    build_response_cache,
+    build_runtime_version,
+)
 from src.pipelines.artifacts import (
     load_long_term_model_artifacts,
     load_recommendation_ranker_artifact,
@@ -28,6 +34,8 @@ class AppResources:
     long_term_data: pd.DataFrame
     short_term_models: dict[str, Any]
     long_term_models: dict[tuple[str, int], Any]
+    response_cache: ResponseCache = field(default_factory=NullResponseCache)
+    runtime_version: str = "local"
 
 
 def load_app_resources(
@@ -36,6 +44,7 @@ def load_app_resources(
 ) -> AppResources:
     """Load data and model artifacts used by API services."""
     recommendation_ranker = load_recommendation_ranker_artifact(artifact_dir, required=False)
+    response_cache = build_response_cache()
     return AppResources(
         recommendation_data=load_recommendation_pipeline_data(
             data_dir,
@@ -45,4 +54,6 @@ def load_app_resources(
         long_term_data=load_long_term_prediction_data(data_dir),
         short_term_models=load_short_term_model_artifacts(artifact_dir),
         long_term_models=load_long_term_model_artifacts(artifact_dir),
+        response_cache=response_cache,
+        runtime_version=build_runtime_version(data_dir, artifact_dir),
     )

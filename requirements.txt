@@ -24,6 +24,7 @@ shap>=0.47,<1.0
 sqlalchemy>=2.0,<3.0
 psycopg[binary]>=3.2,<4.0
 alembic>=1.15,<2.0
+redis>=5.2,<7.0
 
 # Data validation and experiment tracking
 dvc>=3.60,<4.0

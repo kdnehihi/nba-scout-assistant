@@ -27,7 +27,10 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 async def lifespan(app: FastAPI):
     """Load shared data and model artifacts before accepting API requests."""
     app.state.resources = load_app_resources(data_dir="data", artifact_dir="artifacts")
-    yield
+    try:
+        yield
+    finally:
+        app.state.resources.response_cache.close()
 
 
 app = FastAPI(title="NBA Scout Assistant", lifespan=lifespan)
@@ -39,8 +42,11 @@ def get_resources() -> AppResources:
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+def health() -> dict[str, object]:
+    return {
+        "status": "ok",
+        "cache": get_resources().response_cache.health(),
+    }
 
 
 @app.get("/metadata")
