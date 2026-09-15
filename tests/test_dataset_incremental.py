@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from datetime import date
 import gzip
 import json
+from datetime import date
 
 import pandas as pd
 
@@ -12,7 +12,11 @@ from src.dataset.incremental import (
     upsert_player_game_logs,
 )
 from src.dataset.loaders import resolve_data_paths
-from tests.test_dataset_features import sample_game_logs, sample_players, sample_season_stats
+from tests.test_dataset_features import (
+    sample_game_logs,
+    sample_players,
+    sample_season_stats,
+)
 
 
 class StubBallDontLieClient:
@@ -66,7 +70,7 @@ def api_stat_row() -> dict[str, object]:
     }
 
 
-def test_upsert_uses_cross_source_key_and_preserves_existing_game_id():
+def test_upsert_uses_cross_source_key_and_preserves_existing_record():
     existing = pd.DataFrame(
         {
             "player_id": [1],
@@ -79,23 +83,30 @@ def test_upsert_uses_cross_source_key_and_preserves_existing_game_id():
     )
     incoming = pd.DataFrame(
         {
-            "player_id": [1, pd.NA],
-            "game_date": [pd.Timestamp("2025-10-20"), pd.Timestamp("2025-10-20")],
-            "team_id": ["AAA", "BBB"],
-            "game_id": [8001, 8001],
-            "points": [22, 4],
-            "rest_days": [pd.NA, pd.NA],
-            "source_player_id": [100, 999],
+            "player_id": [1, 1, pd.NA],
+            "game_date": [
+                pd.Timestamp("2025-10-20"),
+                pd.Timestamp("2025-10-22"),
+                pd.Timestamp("2025-10-20"),
+            ],
+            "team_id": ["AAA", "AAA", "BBB"],
+            "game_id": [8001, 8002, 8001],
+            "points": [22, 24, 4],
+            "rest_days": [pd.NA, 2.0, pd.NA],
+            "source_player_id": [100, 100, 999],
         }
     )
 
     result, summary = upsert_player_game_logs(existing, incoming)
 
-    assert len(result) == 1
+    assert len(result) == 2
     assert result.iloc[0]["game_id"] == 12345
-    assert result.iloc[0]["points"] == 22
-    assert summary.replaced_rows == 1
-    assert summary.inserted_rows == 0
+    assert result.iloc[0]["points"] == 18
+    assert result.iloc[0]["rest_days"] == 2.0
+    assert result.iloc[1]["game_id"] == 8002
+    assert result.iloc[1]["points"] == 24
+    assert summary.skipped_existing_rows == 1
+    assert summary.inserted_rows == 1
     assert summary.unmatched_rows == 1
 
 

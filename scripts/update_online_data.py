@@ -41,7 +41,7 @@ def main() -> None:
     print("Raw API rows:", result.fetch.raw_row_count)
     print("Mapped incoming rows:", result.upsert.incoming_rows)
     print("Inserted Silver rows:", result.upsert.inserted_rows)
-    print("Replaced Silver rows:", result.upsert.replaced_rows)
+    print("Skipped existing Silver rows:", result.upsert.skipped_existing_rows)
     print("Unmatched API rows:", result.upsert.unmatched_rows)
     print("Bronze snapshot:", result.bronze_snapshot_path)
     print("Silver game logs:", result.silver_game_logs_path)

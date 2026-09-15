@@ -159,12 +159,13 @@ It performs these steps in order:
 6. Store players that cannot be mapped in
    `data/bronze/balldontlie/unmatched_players_latest.parquet`. These rows are
    excluded from Silver until a reviewed mapping or explicit override exists.
-7. Upsert mapped rows using `player_id + game_date + team_id`. This key is used
+7. Append mapped rows using `player_id + game_date + team_id`. This key is used
    instead of `game_id` because game identifiers can differ across sources.
-   Existing canonical game IDs are retained for overlapping rows while updated
-   box-score values replace stale values.
-8. Atomically replace `data/silver/player_game_logs.parquet` and recompute
-   player rest days over the full timeline.
+   Rows whose key already exists are skipped so historical canonical records
+   remain unchanged. Rest days for new rows are computed against the complete
+   existing player timeline before append.
+8. Atomically replace `data/silver/player_game_logs.parquet` only when at least
+   one unseen mapped row is available.
 9. Rebuild `short_term_inference_latest.parquet` without requiring next-five
    labels and rebuild `long_term_player_forecast_inference_latest.parquet`
    without future-season labels.

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
 import gzip
 import json
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +24,6 @@ from .loaders import (
     load_players,
 )
 
-
 BALLDONTLIE_BRONZE_DIR = "balldontlie"
 BALLDONTLIE_STATE_FILE = "ingestion_state.json"
 SILVER_GAME_LOG_FILE = "player_game_logs.parquet"
@@ -35,14 +34,14 @@ UPSERT_KEY_COLUMNS = ["player_id", "game_date", "team_id"]
 
 @dataclass(frozen=True)
 class GameLogUpsertSummary:
-    """Counts describing one canonical Silver game-log upsert."""
+    """Counts describing one append-only canonical Silver game-log update."""
 
     existing_rows: int
     incoming_rows: int
     unmatched_rows: int
     output_rows: int
     inserted_rows: int
-    replaced_rows: int
+    skipped_existing_rows: int
 
 
 @dataclass(frozen=True)
@@ -149,7 +148,7 @@ def upsert_player_game_logs(
     clean_game_logs: pd.DataFrame,
     incoming_game_logs: pd.DataFrame,
 ) -> tuple[pd.DataFrame, GameLogUpsertSummary]:
-    """Upsert mapped API rows into canonical Silver history using cross-source keys."""
+    """Append unseen API rows while preserving every existing Silver record."""
     missing_existing = sorted(set(UPSERT_KEY_COLUMNS) - set(clean_game_logs.columns))
     missing_incoming = sorted(set(UPSERT_KEY_COLUMNS) - set(incoming_game_logs.columns))
     if missing_existing:
@@ -169,7 +168,7 @@ def upsert_player_game_logs(
             unmatched_rows=unmatched_rows,
             output_rows=len(existing),
             inserted_rows=0,
-            replaced_rows=0,
+            skipped_existing_rows=0,
         )
         return existing.reset_index(drop=True), summary
 
@@ -177,21 +176,29 @@ def upsert_player_game_logs(
     incoming_keys = _canonical_upsert_keys(incoming)
     existing["_upsert_key"] = pd.MultiIndex.from_frame(existing_keys).to_flat_index()
     incoming["_upsert_key"] = pd.MultiIndex.from_frame(incoming_keys).to_flat_index()
-    existing = existing.drop_duplicates("_upsert_key", keep="last")
     incoming = incoming.drop_duplicates("_upsert_key", keep="last")
 
-    existing_game_ids = existing.set_index("_upsert_key")["game_id"]
-    overlap_mask = incoming["_upsert_key"].isin(existing_game_ids.index)
-    incoming.loc[overlap_mask, "game_id"] = incoming.loc[overlap_mask, "_upsert_key"].map(
-        existing_game_ids
-    )
+    existing_keys = set(existing["_upsert_key"])
+    overlap_mask = incoming["_upsert_key"].isin(existing_keys)
+    skipped_existing_rows = int(overlap_mask.sum())
+    incoming = incoming.loc[~overlap_mask].copy()
+    inserted_rows = len(incoming)
 
-    replaced_rows = int(overlap_mask.sum())
-    inserted_rows = int(len(incoming) - replaced_rows)
+    if incoming.empty:
+        summary = GameLogUpsertSummary(
+            existing_rows=len(clean_game_logs),
+            incoming_rows=skipped_existing_rows,
+            unmatched_rows=unmatched_rows,
+            output_rows=len(clean_game_logs),
+            inserted_rows=0,
+            skipped_existing_rows=skipped_existing_rows,
+        )
+        return clean_game_logs.copy().reset_index(drop=True), summary
+
     concat_frames = [frame.dropna(axis=1, how="all") for frame in [existing, incoming]]
     combined = pd.concat(concat_frames, ignore_index=True, sort=False)
-    combined = combined.drop_duplicates("_upsert_key", keep="last").drop(columns="_upsert_key")
-    combined = recompute_rest_days(combined)
+    combined = combined.drop(columns="_upsert_key")
+    combined["game_date"] = pd.to_datetime(combined["game_date"], errors="coerce")
 
     preferred_columns = list(clean_game_logs.columns)
     appended_columns = [column for column in combined.columns if column not in preferred_columns]
@@ -202,7 +209,7 @@ def upsert_player_game_logs(
         unmatched_rows=unmatched_rows,
         output_rows=len(combined),
         inserted_rows=inserted_rows,
-        replaced_rows=replaced_rows,
+        skipped_existing_rows=skipped_existing_rows,
     )
     return combined.reset_index(drop=True), summary
 
@@ -268,7 +275,7 @@ def run_balldontlie_incremental_pipeline(
         fetch_result.game_logs,
     )
     silver_path = paths.silver_dir / SILVER_GAME_LOG_FILE
-    if upsert_summary.incoming_rows > 0:
+    if upsert_summary.inserted_rows > 0:
         _atomic_write_parquet(updated_logs, silver_path)
 
     unmatched_path: Path | None = None
